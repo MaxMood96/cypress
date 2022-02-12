@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@cypress/react": "file:../../dist",
-    "mocha-junit-reporter": "^2.0.0",
+    "mocha-junit-reporter": "^2.0.2",
     "mocha-multi-reporters": "^1.5.1"
   }
 }
