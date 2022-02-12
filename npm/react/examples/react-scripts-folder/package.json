@@ -14,6 +14,6 @@
     "check-code-coverage": "1.9.2",
     "mocha-junit-reporter": "^2.0.0",
     "mocha-multi-reporters": "^1.5.1",
-    "react-scripts": "3.4.1"
+    "react-scripts": "3.4.4"
   }
 }
