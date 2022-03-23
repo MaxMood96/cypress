@@ -20,13 +20,13 @@
     "debug": "^4.3.2",
     "fs-extra": "8.1.0",
     "lodash": "^4.17.21",
-    "minimist": "1.2.5"
+    "minimist": "1.2.6"
   },
   "devDependencies": {
     "electron": "15.3.4",
     "electron-packager": "15.4.0",
     "execa": "4.1.0",
-    "mocha": "3.5.3"
+    "mocha": "6.2.3"
   },
   "files": [
     "dist",
