@@ -7,7 +7,9 @@
     "check-coverage": "check-coverage src/App.js src/calc.js src/Child.js",
     "cy:open": "node ../../../../scripts/cypress open-ct",
     "only-covered": "only-covered src/App.js src/calc.js src/Child.js",
-    "test": "node ../../../../scripts/cypress run-ct"
+    "test": "node ../../../../scripts/cypress run-ct",
+    "prepare": "yarn run snyk-protect",
+    "snyk-protect": "snyk-protect"
   },
   "devDependencies": {
     "@cypress/react": "file:../../dist",
@@ -15,5 +17,9 @@
     "mocha-junit-reporter": "^2.0.0",
     "mocha-multi-reporters": "^1.5.1",
     "react-scripts": "3.4.1"
+  },
+  "snyk": true,
+  "dependencies": {
+    "@snyk/protect": "latest"
   }
 }
