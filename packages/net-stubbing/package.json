@@ -14,13 +14,13 @@
     "istextorbinary": "6.0.0",
     "lodash": "^4.17.15",
     "mime-types": "2.1.27",
-    "minimatch": "^3.0.4",
+    "minimatch": "^3.0.5",
     "throttle": "^1.0.3"
   },
   "devDependencies": {
     "bin-up": "1.2.0",
     "chai": "4.2.0",
-    "mocha": "7.1.2"
+    "mocha": "9.2.2"
   },
   "files": [
     "lib"
