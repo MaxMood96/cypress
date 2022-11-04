@@ -9,7 +9,7 @@
     "types": "tsc --noEmit --lib es2015,dom --types cypress cypress/integration/*.ts"
   },
   "devDependencies": {
-    "ts-loader": "7.0.4",
+    "ts-loader": "8.0.14",
     "typescript": "^4.2.3"
   },
   "license": "ISC",
