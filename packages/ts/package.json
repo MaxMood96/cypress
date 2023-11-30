@@ -17,7 +17,7 @@
     "typescript-cached-transpile": "^0.0.6"
   },
   "devDependencies": {
-    "rimraf": "3.0.2"
+    "rimraf": "4.0.0"
   },
   "files": [
     "register.js",
