@@ -166,7 +166,7 @@
     "got": "11.8.5",
     "graphql": "^15.5.1",
     "graphql-executor": "0.0.23",
-    "gulp": "4.0.2",
+    "gulp": "5.0.0",
     "gulp-awspublish": "4.0.0",
     "gulp-debug": "4.0.0",
     "gulp-rename": "1.4.0",
