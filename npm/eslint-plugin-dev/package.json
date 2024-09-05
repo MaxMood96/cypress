@@ -17,12 +17,12 @@
     "shelljs": "0.8.5"
   },
   "devDependencies": {
-    "eslint": "^7.22.0",
+    "eslint": "^8.44.0",
     "eslint-plugin-json-format": "^2.0.0",
-    "eslint-plugin-mocha": "^8.1.0",
+    "eslint-plugin-mocha": "^10.0.4",
     "eslint-plugin-promise": "^4.2.1",
-    "jest": "^24.9.0",
-    "jest-cli": "^24.9.0",
+    "jest": "^27.0.0",
+    "jest-cli": "^27.0.0",
     "sinon": "^7.3.2",
     "sinon-chai": "^3.3.0"
   },
