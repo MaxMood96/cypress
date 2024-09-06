@@ -18,8 +18,8 @@
     "throttle": "^1.0.3"
   },
   "devDependencies": {
-    "chai": "4.2.0",
-    "mocha": "7.1.2",
+    "chai": "4.3.10",
+    "mocha": "9.1.2",
     "rimraf": "3.0.2"
   },
   "files": [
