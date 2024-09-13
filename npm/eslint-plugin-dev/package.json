@@ -23,7 +23,7 @@
     "eslint-plugin-promise": "^4.2.1",
     "jest": "^24.9.0",
     "jest-cli": "^24.9.0",
-    "sinon": "^7.3.2",
+    "sinon": "^19.0.0",
     "sinon-chai": "^3.3.0"
   },
   "peerDependencies": {
