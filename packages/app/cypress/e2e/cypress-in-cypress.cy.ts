@@ -1,3 +1,4 @@
+import type { ReceivedCypressOptions } from '@packages/types'
 import type { DraggablePanel } from '../../src/runner/useRunnerStyle'
 
 const testingTypes = ['component', 'e2e'] as const
@@ -11,9 +12,20 @@ const dragHandleToClientX = (panel: DraggablePanel, x: number) => {
 function startAtSpecsPage (testingType: typeof testingTypes[number]) {
   cy.scaffoldProject('cypress-in-cypress')
   cy.findBrowsers()
-  cy.openProject('cypress-in-cypress')
+
+  openProject(testingType)
+
   cy.startAppServer(testingType)
   cy.visitApp()
+  cy.specsPageIsVisible()
+}
+
+function openProject (testingType: typeof testingTypes[number]) {
+  if (testingType === 'e2e') {
+    cy.openProject('cypress-in-cypress')
+  } else {
+    cy.openProject('cypress-in-cypress', ['--component'])
+  }
 }
 
 // For Cypress-in-Cypress tests that do not vary based on testing type
@@ -26,10 +38,10 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
       cy.waitForSpecToFinish()
 
       cy.withCtx((ctx) => {
-        ctx.coreData.servers.appSocketServer?.emit('automation:disconnected')
+        ctx.coreData.servers.cdpSocketServer?.emit('automation:disconnected')
       })
 
-      cy.contains('h3', 'The Cypress extension has disconnected')
+      cy.contains('h2', 'The Cypress extension has disconnected')
 
       cy.withCtx((ctx, { sinon }) => {
         sinon.stub(ctx.actions.project, 'launchProject').resolves()
@@ -72,7 +84,7 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
         connectedCallback(false)
       })
 
-      cy.contains('h3', 'The Cypress extension is missing')
+      cy.contains('h2', 'The Cypress extension is missing')
 
       // cy.percySnapshot() // TODO: restore when Percy CSS is fixed. See https://github.com/cypress-io/cypress/issues/23435
 
@@ -93,7 +105,7 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
     })
 
     // TODO: fix flaky test https://github.com/cypress-io/cypress/issues/23307
-    it.skip(`scales the AUT correctly in ${testingType}`, () => {
+    it(`scales the AUT correctly in ${testingType}`, { retries: 15 }, () => {
       const assertNoScaleShown = () => {
         // check that no message about scale % is shown,
         // meaning the AUT is at 100% scale
@@ -102,7 +114,7 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
 
       cy.scaffoldProject('cypress-in-cypress')
       cy.findBrowsers()
-      cy.openProject('cypress-in-cypress')
+      openProject(testingType)
       cy.withCtx((ctx) => {
         ctx.coreData.localSettings.preferences.reporterWidth = 800
         ctx.coreData.localSettings.preferences.specListWidth = 250
@@ -111,6 +123,7 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
 
       cy.startAppServer(testingType)
       cy.visitApp()
+      cy.specsPageIsVisible()
 
       cy.get('[data-cy="spec-item"]').first().click()
       // Let runner stabilize
@@ -185,10 +198,8 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
       cy.get('[data-cy="select-browser"]').as('selectBrowser')
 
       cy.viewport(500, 600)
-      cy.get('@selectBrowser')
-      .should('not.be.visible')
-      .scrollIntoView()
-      .should('be.visible') // with no specs list open, we should see this by scrolling
+      cy.get('@selectBrowser').scrollIntoView()
+      cy.get('@selectBrowser').should('be.visible') // with no specs list open, we should see this by scrolling
 
       dragHandleToClientX('panel2', 200).then(() => {
         cy.contains('Chrome 1').should('be.visible')
@@ -197,10 +208,9 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
       cy.contains('[aria-controls=reporter-inline-specs-list]', 'Specs')
       .click({ force: true })
 
-      cy.get('@selectBrowser')
-      .should('not.be.visible')
-      .scrollIntoView()
-      .should('not.be.visible') // with specs list open, scrolling is not enough to see this
+      cy.get('@selectBrowser').should('not.be.visible')
+      cy.get('@selectBrowser').scrollIntoView()
+      cy.get('@selectBrowser').should('not.be.visible') // with specs list open, scrolling is not enough to see this
 
       dragHandleToClientX('panel1', 130)
       cy.get('@selectBrowser')
@@ -227,24 +237,22 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
       cy.get('[data-cy="playground-num-elements"]').contains('1 match')
     })
 
-    it(`hides reporter when NO_COMMAND_LOG is set in open mode for ${testingType}`, () => {
+    it(`hides the command log when hideCommandLog is set in open mode for ${testingType}`, () => {
       cy.scaffoldProject('cypress-in-cypress')
       cy.findBrowsers()
       cy.openProject('cypress-in-cypress')
       cy.startAppServer()
       cy.withCtx(async (ctx, o) => {
-        const config = await ctx.project.getConfig()
+        const config = ctx._apis.projectApi.getConfig()
 
-        o.sinon.stub(ctx.project, 'getConfig').resolves({
+        o.sinon.stub(ctx._apis.projectApi, 'getConfig').returns({
           ...config,
-          env: {
-            ...config.env,
-            NO_COMMAND_LOG: 1,
-          },
-        })
+          hideCommandLog: true,
+        } as ReceivedCypressOptions)
       })
 
       cy.visitApp()
+      cy.specsPageIsVisible()
       cy.contains('dom-content.spec').click()
 
       cy.findByTestId('aut-url-input').invoke('val').should('contain', 'http://localhost:4455/cypress/e2e/dom-content.html')
@@ -260,6 +268,7 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
       cy.openProject('cypress-in-cypress')
       cy.startAppServer()
       cy.visitApp()
+      cy.specsPageIsVisible()
       cy.contains('dom-content.spec').should('exist')
       cy.withCtx(async (ctx, o) => {
         ctx.coreData.app.browserStatus = 'open'
@@ -393,6 +402,41 @@ describe('Cypress in Cypress', { viewportWidth: 1500, defaultCommandTimeout: 100
 
     cy.withRetryableCtx((ctx) => {
       expect(ctx.actions.project.initializeActiveProject).to.be.called
+    })
+  })
+
+  describe('runSpec mutation', () => {
+    it('should trigger expected spec from POST', () => {
+      startAtSpecsPage('e2e')
+
+      cy.contains('E2E specs').should('be.visible')
+
+      cy.withCtx(async (ctx) => {
+        const currentProject = ctx.currentProject?.replaceAll('\\', '/')
+        const specPath = `${currentProject}/cypress/e2e/dom-content.spec.js`
+        const url = `http://127.0.0.1:${ctx.coreData.servers.gqlServerPort}/__launchpad/graphql?`
+        const payload = `{"query":"mutation{\\nrunSpec(specPath:\\"${specPath}\\"){\\n__typename\\n... on RunSpecResponse{\\ntestingType\\nbrowser{\\nid\\nname\\n}\\nspec{\\nid\\nname\\n}\\n}\\n}\\n}","variables":null}`
+
+        ctx.coreData.app.browserStatus = 'open'
+
+        /*
+        Note: If this test starts failing, this fetch is the likely culprit.
+        Validate the GQL payload above is still valid by logging the fetch response JSON
+        */
+
+        await ctx.util.fetch(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+            },
+            body: payload,
+          },
+        )
+      })
+
+      cy.contains('Dom Content').should('be.visible')
     })
   })
 })

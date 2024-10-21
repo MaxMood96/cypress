@@ -11,6 +11,7 @@ import {
   setupHooks,
   checkForRemovedStyleOptions,
 } from '@cypress/mount-utils'
+import { ComponentPublicInstanceConstructor } from 'vue/types/v3-component-public-instance'
 
 const defaultOptions: (keyof MountOptions)[] = [
   'vue',
@@ -67,6 +68,17 @@ const installMixins = (Vue, options) => {
   }
 }
 
+const registerGlobalDirectives = (Vue, options) => {
+  const directives =
+    Cypress._.get(options, 'extensions.directives')
+
+  if (Cypress._.isPlainObject(directives)) {
+    Object.keys(directives).forEach((name) => {
+      Vue.directive(name, directives[name])
+    })
+  }
+}
+
 const hasStore = ({ store }: { store: any }) => Boolean(store && store._vm)
 
 const forEachValue = <T>(obj: Record<string, T>, fn: (value: T, key: string) => void) => {
@@ -108,7 +120,7 @@ const resetStoreVM = (Vue, { store }) => {
  *         ^^^^^ this type
  *  mount(Hello)
  */
-type VueComponent = Vue.ComponentOptions<any> | Vue.VueConstructor
+type VueComponent = Vue.ComponentOptions<any> | Vue.VueConstructor | ComponentPublicInstanceConstructor
 
 /**
  * Options to pass to the component when creating it, like
@@ -123,6 +135,10 @@ type VueLocalComponents = Record<string, VueComponent>
 
 type VueFilters = {
   [key: string]: (value: string) => string
+}
+
+type VueDirectives = {
+  [key: string]: Function | Object
 }
 
 type VueMixin = unknown
@@ -209,6 +225,27 @@ interface MountOptionsExtensions {
    * @memberof MountOptionsExtensions
    */
   plugins?: VuePlugins
+
+  /**
+   * Optional Vue directives to install while mounting the component
+   *
+   * @memberof MountOptionsExtensions
+   * @see https://github.com/cypress-io/cypress/tree/develop/npm/vue#examples
+   * @example
+   *  const directives = {
+   *    custom: {
+   *        name: 'custom',
+   *        bind (el, binding) {
+   *          el.dataset['custom'] = binding.value
+   *        },
+   *        unbind (el) {
+   *          el.removeAttribute('data-custom')
+   *        },
+   *    },
+   *  }
+   *  mount(Hello, { extensions: { directives }})
+   */
+  directives?: VueDirectives
 }
 
 /**
@@ -284,7 +321,7 @@ function failTestOnVueError (err, vm, info) {
 
 /**
  * Extract the component name from the object passed to mount
- * @param componentOptions the compoennt passed to mount
+ * @param componentOptions the component passed to mount
  * @returns name of the component
  */
 function getComponentDisplayName (componentOptions: any): string {
@@ -382,6 +419,7 @@ export const mount = (
     installFilters(localVue, options)
     installMixins(localVue, options)
     installPlugins(localVue, options, props)
+    registerGlobalDirectives(localVue, options)
     registerGlobalComponents(localVue, options)
 
     props.attachTo = componentNode

@@ -1,3 +1,31 @@
+# [@cypress/schematic-v2.5.2](https://github.com/cypress-io/cypress/compare/@cypress/schematic-v2.5.1...@cypress/schematic-v2.5.2) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+# [@cypress/schematic-v2.5.1](https://github.com/cypress-io/cypress/compare/@cypress/schematic-v2.5.0...@cypress/schematic-v2.5.1) (2023-09-07)
+
+# [@cypress/schematic-v2.5.0](https://github.com/cypress-io/cypress/compare/@cypress/schematic-v2.4.0...@cypress/schematic-v2.5.0) (2023-01-25)
+
+
+### Bug Fixes
+
+* **cypress-schematic:** do not disable e2e support file ([#25400](https://github.com/cypress-io/cypress/issues/25400)) ([d52f3dc](https://github.com/cypress-io/cypress/commit/d52f3dc8cbf0daf276d1ec5db95e065cf703b070))
+
+
+### Features
+
+* Add Angular CT Schematic ([#24374](https://github.com/cypress-io/cypress/issues/24374)) ([af6be6f](https://github.com/cypress-io/cypress/commit/af6be6f27d8547bbfbed60cd3a7524861d842548)), closes [#23645](https://github.com/cypress-io/cypress/issues/23645) [#23673](https://github.com/cypress-io/cypress/issues/23673) [#23696](https://github.com/cypress-io/cypress/issues/23696)
+
+# [@cypress/schematic-v2.4.0](https://github.com/cypress-io/cypress/compare/@cypress/schematic-v2.3.0...@cypress/schematic-v2.4.0) (2022-12-02)
+
+
+### Features
+
+* Queries, Detached DOM, and Retry-Ability ([#24628](https://github.com/cypress-io/cypress/issues/24628)) ([9ae911f](https://github.com/cypress-io/cypress/commit/9ae911f396fa6cac0a1464537d1492d68cbb1898)), closes [#23665](https://github.com/cypress-io/cypress/issues/23665) [#24022](https://github.com/cypress-io/cypress/issues/24022) [#23791](https://github.com/cypress-io/cypress/issues/23791) [#24203](https://github.com/cypress-io/cypress/issues/24203) [#24417](https://github.com/cypress-io/cypress/issues/24417)
+
 # [@cypress/schematic-v2.3.0](https://github.com/cypress-io/cypress/compare/@cypress/schematic-v2.2.0...@cypress/schematic-v2.3.0) (2022-11-01)
 
 

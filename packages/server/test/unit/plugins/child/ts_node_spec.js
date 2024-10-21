@@ -1,7 +1,6 @@
 require('../../../spec_helper')
 
 const tsnode = require('ts-node')
-const typescriptObject = require('typescript/lib/typescript.js')
 
 const resolve = require(`../../../../lib/util/resolve`)
 
@@ -14,32 +13,27 @@ describe('lib/plugins/child/ts_node', () => {
   })
 
   describe('typescript registration', () => {
-    it('registers ts-node if typescript is installed', () => {
-      sinon.stub(typescriptObject, 'version').value('1.1.1')
+    it('registers ts-node with preserveValueImports if typescript 4.5.0 and above is installed', () => {
+      // Since Cypress server is now bundled with Typescript 5, we can no longer stub the typescript object due to
+      // API changes (@see https://github.com/microsoft/TypeScript/wiki/API-Breaking-Changes#typescript-50)
+      // Cypress no longer supports Typescript 3 and below as of Cypress 13, so this singular test to verify
+      // preserveValueImports is present on the compilerOptions above 4.5.0 should be valid enough.
       tsNodeUtil.register('proj-root', '/path/to/plugins/file.js')
-
       expect(tsnode.register).to.be.calledWith({
         transpileOnly: true,
         compiler: 'typescript/lib/typescript.js',
         dir: '/path/to/plugins',
         compilerOptions: {
           module: 'commonjs',
-        },
-      })
-    })
-
-    it('registers ts-node with preserveValueImports if typescript 4.5.0 is installed', () => {
-      sinon.stub(typescriptObject, 'version').value('4.5.0')
-      tsNodeUtil.register('proj-root', '/path/to/plugins/file.js')
-
-      expect(tsnode.register).to.be.calledWith({
-        transpileOnly: true,
-        compiler: 'typescript/lib/typescript.js',
-        dir: '/path/to/plugins',
-        compilerOptions: {
-          module: 'commonjs',
+          moduleResolution: 'node',
           preserveValueImports: false,
         },
+        ignore: [
+          '(?:^|/)node_modules/',
+          '/packages/telemetry/dist/span-exporters/ipc-span-exporter',
+          '/packages/telemetry/dist/span-exporters/console-trace-link-exporter',
+          '/packages/telemetry/dist/processors/on-start-span-processor',
+        ],
       })
     })
 
@@ -55,6 +49,7 @@ describe('lib/plugins/child/ts_node', () => {
       sinon.spy(console, 'warn')
       tsNodeUtil.register('proj-root', '/path/to/plugins/file.js')
 
+      // eslint-disable-next-line no-console
       expect(console.warn).not.to.be.calledWith('Missing baseUrl in compilerOptions. tsconfig-paths will be skipped')
     })
   })

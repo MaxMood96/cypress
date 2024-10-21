@@ -1,9 +1,9 @@
-// TODO: once Zach W finishes NextJS support, cut over devServer
-// onto the proper Object API
-
 module.exports = {
   component: {
-    devServer: {}
-  }
+    experimentalSingleTabRunMode: true,
+    devServer: {
+      framework: 'next',
+      bundler: 'webpack',
+    },
+  },
 }
-

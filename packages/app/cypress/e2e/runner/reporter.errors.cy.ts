@@ -180,6 +180,18 @@ describe('errors ui', {
       ],
     })
 
+    verify('spec unhandled rejection with string content', {
+      uncaught: true,
+      column: 20,
+      originalMessage: 'Unhandled promise rejection with string content from the spec',
+      message: [
+        'The following error originated from your test code',
+        'It was caused by an unhandled promise rejection',
+      ],
+      stackRegex: /.*/,
+      hasCodeFrame: false,
+    })
+
     verify('spec unhandled rejection with done', {
       uncaught: true,
       column: 20,
@@ -249,6 +261,10 @@ describe('errors ui', {
     })
   })
 
+  // FIXME: @see https://github.com/cypress-io/cypress/issues/29614
+  // projects using Typescript 5 do not calculate the userInvocationStack correctly,
+  // leading to a small mismatch when linking stack traces back to the user's IDE from
+  // the command log.
   it('typescript', () => {
     const verify = loadErrorSpec({
       filePath: 'errors/typescript.cy.ts',
@@ -256,17 +272,15 @@ describe('errors ui', {
     })
 
     verify('assertion failure', {
-      column: 25,
       message: `expected 'actual' to equal 'expected'`,
     })
 
     verify('exception', {
-      column: 10,
+      column: 12,
       message: 'bar is not a function',
     })
 
     verify('command failure', {
-      column: 8,
       message: 'Timed out retrying after 0ms: Expected to find element: #does-not-exist, but never found it',
       codeFrameText: `.get('#does-not-exist')`,
     })

@@ -8,6 +8,7 @@ import $Cypress from '../cypress'
 import { $Cy } from '../cypress/cy'
 import { $Location } from '../cypress/location'
 import $Commands from '../cypress/commands'
+import $errUtils from '../cypress/error_utils'
 import { create as createLog } from '../cypress/log'
 import { bindToListeners } from '../cy/listeners'
 import { handleOriginFn } from './origin_fn'
@@ -81,19 +82,6 @@ const createCypress = () => {
     }
   })
 
-  Cypress.specBridgeCommunicator.on('snapshot:generate:for:log', ({ name }, { responseEvent }) => {
-    // if the snapshot cannot be taken (in a transitory space), set to an empty object in order to not fail serialization
-    let requestedCrossOriginSnapshot = {}
-
-    // don't attempt to take snapshots after the spec bridge has been unloaded. Instead, send an empty snapshot back to the primary
-    // to display current state of dom
-    if (cy.state('document') !== undefined) {
-      requestedCrossOriginSnapshot = cy.createSnapshot(name) || {}
-    }
-
-    Cypress.specBridgeCommunicator.toPrimary(responseEvent, requestedCrossOriginSnapshot)
-  })
-
   Cypress.specBridgeCommunicator.toPrimary('bridge:ready')
 }
 
@@ -134,6 +122,20 @@ const setup = (cypressConfig: Cypress.Config, env: Cypress.ObjectLike) => {
   Cypress.Commands = $Commands.create(Cypress, cy, state, config)
   // @ts-ignore
   Cypress.isCy = cy.isCy
+
+  // this is "valid" inside the cy.origin() callback (as long as the experimental
+  // flag is enabled), but it should be replaced by the preprocessor at runtime
+  // with an actual require() before it's run in the browser. if it's not,
+  // something unexpected has gone wrong
+  // @ts-expect-error
+  Cypress.require = () => {
+    // @ts-ignore
+    if (!Cypress.config('experimentalOriginDependencies')) {
+      $errUtils.throwErrByPath('require.invalid_without_flag')
+    }
+
+    $errUtils.throwErrByPath('require.invalid_inside_origin')
+  }
 
   handleOriginFn(Cypress, cy)
   handleLogs(Cypress)
@@ -216,10 +218,13 @@ const attachToWindow = (autWindow: Window) => {
       Cypress.specBridgeCommunicator.toPrimary('window:load', { url: remoteLocation.href })
       cy.isStable(true, 'load')
     },
-    onUnload (e) {
+    onPageHide (e) {
       cy.state('window', undefined)
       cy.state('document', undefined)
 
+      // unload is being actively deprecated/removed by chrome, so for
+      // compatibility, we are using `window`'s `pagehide` event as a proxy
+      // for the `window:unload` event that we emit. See: https://github.com/cypress-io/cypress/pull/29525
       return Cypress.action('app:window:unload', e)
     },
     onNavigation (...args) {

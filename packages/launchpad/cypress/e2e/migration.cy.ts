@@ -1,4 +1,5 @@
 import type { ProjectFixtureDir } from '@tooling/system-tests'
+import type { SinonStub } from 'sinon'
 import { getPathForPlatform } from './support/getPathForPlatform'
 
 // @ts-ignore
@@ -26,7 +27,6 @@ function scaffoldAndVisitLaunchpad (project: ProjectFixtureDir, argv?: string[])
   cy.scaffoldProject(project)
   cy.openProject(project, argv)
   cy.visitLaunchpad()
-  cy.skipWelcome()
 }
 
 function startMigrationFor (project: ProjectFixtureDir, argv?: string[]) {
@@ -59,7 +59,7 @@ function finishMigrationAndContinue () {
 }
 
 function checkOutcome () {
-  cy.contains('Welcome to Cypress!').should('be.visible')
+  cy.contains('Welcome to Cypress!', { timeout: 10000 }).should('be.visible')
 }
 
 function runAutoRename () {
@@ -86,16 +86,14 @@ describe('global mode', () => {
     cy.addProject('migration-e2e-custom-integration-with-projectId')
     cy.visitLaunchpad()
 
-    cy.withCtx((ctx, o) => {
-      o.sinon.stub(ctx.actions.migration, 'locallyInstalledCypressVersion').resolves('10.0.0')
+    cy.withCtx(async (ctx, o) => {
+      o.sinon.stub(ctx.actions.migration, 'locallyInstalledCypressVersion').resolves((await ctx.versions.versionData()).current.version)
     })
-
-    cy.contains('button', cy.i18n.majorVersionWelcome.actionContinue).click()
 
     cy.contains('migration-e2e-export-default').click()
 
     // rename integration->e2e
-    cy.get(renameAutoStep).should('exist')
+    cy.get(renameAutoStep, { timeout: 10000 }).should('exist')
     cy.get(renameManualStep).should('not.exist')
 
     // cypress/support/index.ts -> cypress/support/e2e.ts
@@ -132,7 +130,6 @@ describe('Opening unmigrated project', () => {
     cy.scaffoldProject('migration')
     cy.openProject('migration', ['--e2e'])
     cy.visitLaunchpad()
-    cy.skipWelcome()
     cy.get('h1').should('contain', 'Migrating')
   })
 
@@ -140,14 +137,13 @@ describe('Opening unmigrated project', () => {
     cy.scaffoldProject('migration-component-testing')
     cy.openProject('migration-component-testing', ['--component'])
     cy.visitLaunchpad()
-    cy.skipWelcome()
     cy.get('h1').should('contain', 'Migrating')
   })
 
   it('major version welcome page appears with correct links and can be dismissed', () => {
     cy.scaffoldProject('migration')
     cy.openProject('migration')
-    cy.visitLaunchpad()
+    cy.visitLaunchpad({ showWelcome: true })
 
     cy.contains(cy.i18n.majorVersionWelcome.title).should('be.visible')
 
@@ -168,7 +164,11 @@ describe('Opening unmigrated project', () => {
 
     cy.contains('button', cy.i18n.majorVersionWelcome.actionContinue).click()
     cy.contains(cy.i18n.majorVersionWelcome.title).should('not.exist')
-    cy.contains('h1', 'Migrating to Cypress 11').should('be.visible')
+    cy.contains('h1', `Migrating to Cypress ${Cypress.version.split('.')[0]}`).should('be.visible')
+
+    // Wait for migration prompt and current version to load before taking a snapshot
+    cy.get('.spinner').should('not.exist')
+    cy.findByTestId('top-nav-cypress-version-current-link').should('be.visible')
 
     cy.percySnapshot()
   })
@@ -633,7 +633,9 @@ describe('Full migration flow for each project', { retries: { openMode: 0, runMo
   })
 
   it('completes journey for migration-e2e-custom-test-files', () => {
-    startMigrationFor('migration-e2e-custom-test-files')
+    const project = 'migration-e2e-custom-test-files-array'
+
+    startMigrationFor(project)
     // default integration but custom testFiles
     // can rename integration->e2e
     cy.get(renameAutoStep).should('exist')
@@ -644,8 +646,8 @@ describe('Full migration flow for each project', { retries: { openMode: 0, runMo
     cy.get(setupComponentStep).should('not.exist')
     cy.get(configFileStep).should('exist')
 
-    cy.scaffoldProject('migration-e2e-custom-test-files')
-    cy.openProject('migration-e2e-custom-test-files')
+    cy.scaffoldProject(project)
+    cy.openProject(project)
     cy.visitLaunchpad()
 
     // default testFiles but custom integration - can rename automatically
@@ -660,14 +662,16 @@ describe('Full migration flow for each project', { retries: { openMode: 0, runMo
     // Migration workflow
     // before auto migration
     cy.contains('cypress/integration/basic.test.js')
+    cy.contains('cypress/integration/basic.spec.js')
 
     // after auto migration
     cy.contains('cypress/e2e/basic.test.js')
+    cy.contains('cypress/e2e/basic.spec.js')
 
     runAutoRename()
 
     cy.withRetryableCtx(async (ctx) => {
-      const specs = ['cypress/e2e/basic.test.js']
+      const specs = ['cypress/e2e/basic.test.js', 'cypress/e2e/basic.spec.js']
 
       for (const spec of specs) {
         const stats = await ctx.file.checkIfFileExists(ctx.path.join(spec))
@@ -1011,23 +1015,6 @@ describe('Full migration flow for each project', { retries: { openMode: 0, runMo
 
     runAutoRename()
 
-    migrateAndVerifyConfig()
-    checkOutcome()
-  })
-
-  // TODO: Do we need to consider this case?
-  it.skip('completes journey for migration-e2e-defaults-no-specs', () => {
-    startMigrationFor('migration-e2e-defaults-no-specs')
-    // no specs, nothing to rename?
-    cy.get(renameAutoStep).should('not.exist')
-    // no CT
-    cy.get(renameManualStep).should('not.exist')
-    // supportFile is false - cannot migrate
-    cy.get(renameSupportStep).should('exist')
-    cy.get(setupComponentStep).should('not.exist')
-    cy.get(configFileStep).should('exist')
-
-    renameSupport()
     migrateAndVerifyConfig()
     checkOutcome()
   })
@@ -1672,5 +1659,126 @@ describe('Migrate custom config files', () => {
     const err = `Looked for pluginsFile at foo/bar, but it was not found.`
 
     cy.contains(err)
+  })
+})
+
+describe('v13 migration welcome page with video', () => {
+  it('Welcome page should appear if video is not present (failure)', () => {
+    cy.withCtx((ctx, o) => {
+      const originalGetVideoEmbedHtml = ctx.migration.getVideoEmbedHtml
+
+      o.sinon.stub(ctx.migration, 'getVideoEmbedHtml').callsFake(async () => {
+        const mockMigrationSourceGetVideoEmbedHtmlCTX = {
+          ctx: {
+            coreData: {
+              migration: {
+                videoEmbedHtml: undefined,
+              },
+            },
+            versions: {
+              versionData: () => {
+                return {
+                  current: {
+                    version: '13.0.0',
+                  },
+                }
+              },
+            },
+            util: {
+              fetch: () => {
+                throw new Error('kaboom')
+              },
+            },
+          },
+        }
+
+        return originalGetVideoEmbedHtml.apply(mockMigrationSourceGetVideoEmbedHtmlCTX)
+      })
+    })
+
+    cy.scaffoldProject('migration-v12-to-v13')
+    cy.openProject('migration-v12-to-v13')
+
+    cy.visitLaunchpad({ showWelcome: true })
+    cy.contains(cy.i18n.majorVersionWelcome.title).should('be.visible')
+    cy.get('[data-cy="video-container"]').should('not.exist')
+  })
+
+  it('Welcome page should appear if video is not present (timeout)', () => {
+    cy.withCtx((ctx, o) => {
+      const originalGetVideoEmbedHtml = ctx.migration.getVideoEmbedHtml
+
+      o.sinon.stub(ctx.migration, 'getVideoEmbedHtml').callsFake(async () => {
+        const mockMigrationSourceGetVideoEmbedHtmlCTX = {
+          ctx: {
+            coreData: {
+              migration: {
+                videoEmbedHtml: undefined,
+              },
+            },
+            versions: {
+              versionData: () => {
+                return {
+                  current: {
+                    version: '13.0.0',
+                  },
+                }
+              },
+            },
+            util: {
+              fetch: () => {
+                return new Promise((resolve, reject) => {
+                  setTimeout(() => {
+                    // the request should time out before this body is returned
+                    resolve({
+                      json () {
+                        return {
+                          videoHtml: '<span>Stubbed Video Content</span>',
+                        }
+                      },
+                    })
+                  }, 4000)
+                })
+              },
+            },
+          },
+        }
+
+        return originalGetVideoEmbedHtml.apply(mockMigrationSourceGetVideoEmbedHtmlCTX)
+      })
+    })
+
+    cy.scaffoldProject('migration-v12-to-v13')
+    cy.openProject('migration-v12-to-v13')
+
+    cy.visitLaunchpad({ showWelcome: true })
+    cy.contains(cy.i18n.majorVersionWelcome.title, {
+      timeout: 8000,
+    }).should('be.visible')
+
+    cy.get('[data-cy="video-container"]').should('not.exist')
+  })
+
+  it('Welcome page should appear if video is present', () => {
+    cy.scaffoldProject('migration-v12-to-v13')
+    cy.openProject('migration-v12-to-v13')
+
+    cy.visitLaunchpad({ showWelcome: true })
+    cy.contains(cy.i18n.majorVersionWelcome.title).should('be.visible')
+    cy.get('[data-cy="video-container"]').should('be.visible')
+  })
+
+  it('should only hit the video on link once & cache it', () => {
+    cy.scaffoldProject('migration-v12-to-v13')
+    cy.openProject('migration-v12-to-v13')
+
+    cy.visitLaunchpad({ showWelcome: true })
+    cy.contains(cy.i18n.majorVersionWelcome.title).should('be.visible')
+
+    cy.visitLaunchpad({ showWelcome: true })
+    cy.contains(cy.i18n.majorVersionWelcome.title).should('be.visible')
+    cy.withCtx((ctx, o) => {
+      expect((ctx.util.fetch as SinonStub).args.filter((a) => String(a[0]).includes('v13-video-embed')).length).to.eq(1)
+    })
   })
 })

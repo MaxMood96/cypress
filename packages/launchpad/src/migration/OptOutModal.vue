@@ -2,6 +2,7 @@
   <StandardModal
     :model-value="true"
     :title="t('migration.renameAuto.modal.title')"
+    :no-help="true"
     @update:modelValue="emit('cancel')"
   >
     <Alert
@@ -12,7 +13,7 @@
     />
     <MigrationTitle
       :title="t('migration.renameAuto.title')"
-      class="mt-24px"
+      class="mt-[24px]"
     />
     <MigrationList>
       <MigrationListItem>
@@ -92,14 +93,14 @@
       </template>
     </Radio>
     <template #footer>
-      <div class="flex gap-16px">
+      <div class="flex gap-[16px]">
         <Button
           @click="emit('save', selectedValue)"
         >
           {{ t('migration.renameAuto.modal.buttonSave') }}
         </Button>
         <Button
-          variant="outline"
+          variant="outline-light"
           @click="emit('cancel')"
         >
           {{ t('migration.renameAuto.modal.buttonCancel') }}
@@ -112,7 +113,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import Alert from '@cy/components/Alert.vue'
-import Button from '@cy/components/Button.vue'
+import Button from '@cypress-design/vue-button'
 import CodeTag from '@cy/components/CodeTag.vue'
 import StandardModal from '@cy/components/StandardModal.vue'
 import Radio from '@cy/components/Radio.vue'

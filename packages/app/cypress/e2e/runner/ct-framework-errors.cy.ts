@@ -33,7 +33,7 @@ function verifyErrorOnlyCapturedOnce (err: string) {
 function loadErrorSpec (options: Options): VerifyFunc {
   const { projectName, filePath, failCount, passCount = '--', configFile } = options
 
-  cy.openProject(projectName, ['--config-file', configFile])
+  cy.openProject(projectName, ['--config-file', configFile, '--component'])
   cy.startAppServer('component')
   cy.visitApp(`specs/runner?file=${filePath}`)
 
@@ -68,13 +68,13 @@ reactVersions.forEach((reactVersion) => {
     it('error conditions', () => {
       const verify = loadErrorSpec({
         projectName: `react${reactVersion}`,
-        configFile: 'cypress-vite.config.ts',
+        configFile: 'cypress-vite-default.config.ts',
         filePath: 'src/Errors.cy.jsx',
         failCount: 4,
       })
 
       verify('error on mount', {
-        line: 6,
+        line: 5,
         column: 33,
         uncaught: true,
         uncaughtMessage: 'mount error',
@@ -86,8 +86,8 @@ reactVersions.forEach((reactVersion) => {
       })
 
       verify('sync error', {
-        line: 11,
-        column: 34,
+        line: 12,
+        column: 19,
         uncaught: true,
         uncaughtMessage: 'sync error',
         message: [
@@ -101,8 +101,8 @@ reactVersions.forEach((reactVersion) => {
       })
 
       verify('async error', {
-        line: 18,
-        column: 38,
+        line: 21,
+        column: 21,
         uncaught: true,
         uncaughtMessage: 'async error',
         message: [
@@ -116,7 +116,7 @@ reactVersions.forEach((reactVersion) => {
       })
 
       verify('command failure', {
-        line: 43,
+        line: 47,
         column: 8,
         command: 'get',
         message: [
@@ -136,19 +136,19 @@ describe('Next.js', {
   numTestsKeptInMemory: 1,
 }, () => {
   beforeEach(() => {
-    cy.scaffoldProject('next-12')
+    cy.scaffoldProject('next-14')
   })
 
   it('error conditions', () => {
     const verify = loadErrorSpec({
-      projectName: 'next-12',
+      projectName: 'next-14',
       configFile: 'cypress.config.js',
       filePath: 'cypress/Errors.cy.jsx',
       failCount: 4,
     })
 
     verify('error on mount', {
-      line: 7,
+      line: 6,
       column: 33,
       uncaught: true,
       uncaughtMessage: 'mount error',
@@ -160,8 +160,8 @@ describe('Next.js', {
     })
 
     verify('sync error', {
-      line: 12,
-      column: 34,
+      line: 13,
+      column: 19,
       uncaught: true,
       uncaughtMessage: 'sync error',
       message: [
@@ -175,8 +175,8 @@ describe('Next.js', {
     })
 
     verify('async error', {
-      line: 19,
-      column: 38,
+      line: 22,
+      column: 21,
       uncaught: true,
       uncaughtMessage: 'async error',
       message: [
@@ -189,7 +189,7 @@ describe('Next.js', {
     })
 
     verify('command failure', {
-      line: 44,
+      line: 48,
       column: 8,
       command: 'get',
       message: [
@@ -265,8 +265,8 @@ describe('Vue', {
         'Timed out retrying',
         'element-that-does-not-exist',
       ],
-      codeFrameRegex: /Errors\.cy\.js:26/,
-      stackRegex: /Errors\.cy\.js:26/,
+      codeFrameRegex: /Errors\.cy\.js:25/,
+      stackRegex: /Errors\.cy\.js:25/,
     })
   })
 })
@@ -338,8 +338,8 @@ describe('Nuxt', {
         'Timed out retrying',
         'element-that-does-not-exist',
       ],
-      codeFrameRegex: /Errors\.cy\.js:26/,
-      stackRegex: /Errors\.cy\.js:26/,
+      codeFrameRegex: /Errors\.cy\.js:25/,
+      stackRegex: /Errors\.cy\.js:25/,
     })
   })
 })
@@ -465,7 +465,7 @@ angularVersions.forEach((angularVersion) => {
       })
 
       verify('command failure', {
-        line: 21,
+        line: 20,
         column: 8,
         command: 'get',
         message: [

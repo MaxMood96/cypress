@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { action } from 'mobx'
 import appState, { AppState } from './app-state'
-import runnablesStore, { RunnablesStore, RootRunnable, LogProps } from '../runnables/runnables-store'
+import runnablesStore, { RunnablesStore, LogProps, RootRunnable } from '../runnables/runnables-store'
 import statsStore, { StatsStore } from '../header/stats-store'
 import scroller, { Scroller } from './scroller'
 import { UpdatableTestProps, UpdateTestCallback, TestProps } from '../test/test-model'
@@ -95,10 +95,12 @@ const events: Events = {
       runnablesStore.runnableStarted(runnable)
     }))
 
-    runner.on('test:after:run', action('test:after:run', (runnable: TestProps) => {
-      runnablesStore.runnableFinished(runnable)
+    runner.on('test:after:run', action('test:after:run', (runnable: TestProps, isInteractive: boolean) => {
+      runnablesStore.runnableFinished(runnable, isInteractive)
       if (runnable.final && !appState.studioActive) {
-        statsStore.incrementCount(runnable.state!)
+        // When displaying the overall test status, we want to reference the test outerStatus
+        // as the last runnable (test attempt) may have passed, but the outerStatus might mark the test run as a failure.
+        statsStore.incrementCount(runnable?._cypressTestStatusInfo?.outerStatus || runnable.state!)
       }
     }))
 
@@ -143,6 +145,10 @@ const events: Events = {
       appState.stop()
       runner.emit('runner:stop')
     }))
+
+    localBus.on('testFilter:cloudDebug:dismiss', () => {
+      runner.emit('testFilter:cloudDebug:dismiss')
+    })
 
     localBus.on('restart', action('restart', () => {
       runner.emit('runner:restart')
@@ -190,7 +196,8 @@ const events: Events = {
 
     localBus.on('save:state', () => {
       runner.emit('save:state', {
-        autoScrollingEnabled: appState.autoScrollingEnabled,
+        // the "autoScrollingEnabled" key in `savedState` stores to the preference value itself, it is not the same as the "autoScrollingEnabled" variable stored in application state, which can be temporarily deactivated
+        autoScrollingEnabled: appState.autoScrollingUserPref,
         isSpecsListOpen: appState.isSpecsListOpen,
       })
     })

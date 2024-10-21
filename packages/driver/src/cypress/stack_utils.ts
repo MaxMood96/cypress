@@ -100,7 +100,7 @@ const stackWithUserInvocationStackSpliced = (err, userInvocationStack): StackAnd
   }
 }
 
-type InvocationDetails = LineDetail | {}
+type InvocationDetails = MessageLineDetail | {}
 
 const getInvocationDetails = (specWindow, config) => {
   if (specWindow.Error) {
@@ -305,12 +305,12 @@ const stripCustomProtocol = (filePath) => {
   return filePath.replace(customProtocolRegex, '')
 }
 
-type LineDetail =
-{
+interface MessageLineDetail {
   message: any
   whitespace: any
-} |
-{
+}
+
+interface StackLineDetail {
   function: any
   fileUrl: any
   originalFile: any
@@ -321,7 +321,7 @@ type LineDetail =
   whitespace: any
 }
 
-const getSourceDetailsForLine = (projectRoot, line): LineDetail => {
+const getSourceDetailsForLine = (projectRoot, line): MessageLineDetail | StackLineDetail => {
   const whitespace = getWhitespace(line)
   const generatedDetails = parseLine(line)
 
@@ -382,7 +382,7 @@ const getSourceDetailsForFirstLine = (stack, projectRoot) => {
 
   if (!line) return
 
-  return getSourceDetailsForLine(projectRoot, line)
+  return getSourceDetailsForLine(projectRoot, line) as StackLineDetail
 }
 
 const reconstructStack = (parsedStack) => {
@@ -482,16 +482,19 @@ const normalizedUserInvocationStack = (userInvocationStack) => {
   // add/$Chainer.prototype[key] (cypress:///../driver/src/cypress/chainer.js:30:128)
   // whereas Chromium browsers have the user's line first
   const stackLines = getStackLines(userInvocationStack)
-  const winnowedStackLines = _.reject(stackLines, (line) => {
-    // WARNING: STACK TRACE WILL BE DIFFERENT IN DEVELOPMENT vs PRODUCTOIN
+  const nonCypressStackLines = _.reject(stackLines, (line) => {
+    // WARNING: STACK TRACE WILL BE DIFFERENT IN DEVELOPMENT vs PRODUCTION
     // stacks in development builds look like:
     //     at cypressErr (cypress:///../driver/src/cypress/error_utils.js:259:17)
     // stacks in prod builds look like:
     //     at cypressErr (http://localhost:3500/isolated-runner/cypress_runner.js:173123:17)
-    return line.includes('cy[name]') || line.includes('Chainer.prototype[key]') || line.includes('cy.<computed>') || line.includes('$Chainer.<computed>')
+    return line.includes('cy[name]')
+    || line.includes('Chainer.prototype[key]')
+    || line.includes('cy.<computed>')
+    || line.includes('$Chainer.<computed>')
   }).join('\n')
 
-  return normalizeStackIndentation(winnowedStackLines)
+  return normalizeStackIndentation(nonCypressStackLines)
 }
 
 export default {

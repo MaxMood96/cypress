@@ -1,3 +1,88 @@
+# [@cypress/vite-dev-server-v5.2.0](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.1.1...@cypress/vite-dev-server-v5.2.0) (2024-08-27)
+
+
+### Features
+
+* implement JIT component experiment ([#30049](https://github.com/cypress-io/cypress/issues/30049)) ([57f6110](https://github.com/cypress-io/cypress/commit/57f6110d29f0b234c969abc747f0fae29c0f4ead))
+
+# [@cypress/vite-dev-server-v5.1.1](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.1.0...@cypress/vite-dev-server-v5.1.1) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+# [@cypress/vite-dev-server-v5.1.0](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.7...@cypress/vite-dev-server-v5.1.0) (2024-05-21)
+
+
+### Features
+
+* support vite v5 ([#29518](https://github.com/cypress-io/cypress/issues/29518)) ([079030b](https://github.com/cypress-io/cypress/commit/079030bb5f25b0983b9046d0f692e79790d10bcf))
+
+# [@cypress/vite-dev-server-v5.0.7](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.6...@cypress/vite-dev-server-v5.0.7) (2023-12-26)
+
+# [@cypress/vite-dev-server-v5.0.6](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.5...@cypress/vite-dev-server-v5.0.6) (2023-08-29)
+
+
+### Bug Fixes
+
+* allow cypress config.port to override devServer.port for proxying assets ([f82fdf0](https://github.com/cypress-io/cypress/commit/f82fdf026eeab125a2b974e4257a7ac5e33640eb))
+
+# [@cypress/vite-dev-server-v5.0.5](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.4...@cypress/vite-dev-server-v5.0.5) (2023-03-20)
+
+
+### Bug Fixes
+
+* Vite dev server add searchForWorkspaceRoot ([#26036](https://github.com/cypress-io/cypress/issues/26036)) ([6397ac6](https://github.com/cypress-io/cypress/commit/6397ac60da1bfa7149212aeab5f0ae4c5d6372d7))
+* **vite-dev-server:** do not use incremental esbuild option with Vite v4.2.0+ ([#26139](https://github.com/cypress-io/cypress/issues/26139)) ([3a2b2d3](https://github.com/cypress-io/cypress/commit/3a2b2d3323310c68f72f6e42203f5e93afc1cde5))
+
+# [@cypress/vite-dev-server-v5.0.4](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.3...@cypress/vite-dev-server-v5.0.4) (2023-02-24)
+
+
+### Bug Fixes
+
+* vite-dev-server windows ([#25889](https://github.com/cypress-io/cypress/issues/25889)) ([0981fcf](https://github.com/cypress-io/cypress/commit/0981fcf6ac3cd955dc45a554df350af5fc538b3c))
+
+# [@cypress/vite-dev-server-v5.0.3](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.2...@cypress/vite-dev-server-v5.0.3) (2023-02-17)
+
+
+### Bug Fixes
+
+* allow running tests outside Vite project root folder ([#25801](https://github.com/cypress-io/cypress/issues/25801)) ([d54fa65](https://github.com/cypress-io/cypress/commit/d54fa65f587da2b86c8d3140f44c653888fb62ee))
+
+# [@cypress/vite-dev-server-v5.0.2](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.1...@cypress/vite-dev-server-v5.0.2) (2022-12-09)
+
+
+### Bug Fixes
+
+* **vite-dev-server:** ensure assets are correctly reloaded ([#24965](https://github.com/cypress-io/cypress/issues/24965)) ([89c013f](https://github.com/cypress-io/cypress/commit/89c013fcedc2509850ec820f938d33f08f9cbb42))
+
+# [@cypress/vite-dev-server-v5.0.1](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v5.0.0...@cypress/vite-dev-server-v5.0.1) (2022-12-08)
+
+
+### Bug Fixes
+
+* add v8 snapshot usage to cypress in cypress testing ([#24860](https://github.com/cypress-io/cypress/issues/24860)) ([c540284](https://github.com/cypress-io/cypress/commit/c540284f5080d46a8597e53dd2213cb6fb133078))
+
+# [@cypress/vite-dev-server-v5.0.0](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v4.0.1...@cypress/vite-dev-server-v5.0.0) (2022-12-02)
+
+
+### chore
+
+* remove experimentalSessionAndOrigin flag ([#24340](https://github.com/cypress-io/cypress/issues/24340)) ([69873ae](https://github.com/cypress-io/cypress/commit/69873ae9884228f15310fd151e42cbc0cb712817))
+
+
+### BREAKING CHANGES
+
+* removed experimentalSessionAndOrigin flag. testIsolation defaults to strict
+
+# [@cypress/vite-dev-server-v4.0.1](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v4.0.0...@cypress/vite-dev-server-v4.0.1) (2022-11-08)
+
+
+### Bug Fixes
+
+* vite-dev-server hoisting issue in binary ([#24599](https://github.com/cypress-io/cypress/issues/24599)) ([2513bea](https://github.com/cypress-io/cypress/commit/2513beac307e95267ab736a93a39cd1cd1280506))
+
 # [@cypress/vite-dev-server-v4.0.0](https://github.com/cypress-io/cypress/compare/@cypress/vite-dev-server-v3.4.0...@cypress/vite-dev-server-v4.0.0) (2022-11-07)
 
 

@@ -1,3 +1,196 @@
+# [@cypress/webpack-dev-server-v3.11.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.10.1...@cypress/webpack-dev-server-v3.11.0) (2024-08-27)
+
+
+### Features
+
+* implement JIT component experiment ([#30049](https://github.com/cypress-io/cypress/issues/30049)) ([57f6110](https://github.com/cypress-io/cypress/commit/57f6110d29f0b234c969abc747f0fae29c0f4ead))
+
+# [@cypress/webpack-dev-server-v3.10.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.10.0...@cypress/webpack-dev-server-v3.10.1) (2024-08-01)
+
+
+### Bug Fixes
+
+* **deps:** update dependency webpack-dev-server to ^4.15.2 ([#29936](https://github.com/cypress-io/cypress/issues/29936)) ([f2b41b0](https://github.com/cypress-io/cypress/commit/f2b41b0103f0f9f9d50ea1d07d45ee8f8a677f48))
+
+# [@cypress/webpack-dev-server-v3.10.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.9.0...@cypress/webpack-dev-server-v3.10.0) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+
+### Features
+
+* add CT support for angular 18 ([#29584](https://github.com/cypress-io/cypress/issues/29584)) ([cceea03](https://github.com/cypress-io/cypress/commit/cceea0386447bbf8ada7dab22e7159a78060bcca))
+
+# [@cypress/webpack-dev-server-v3.9.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.8.0...@cypress/webpack-dev-server-v3.9.0) (2024-05-30)
+
+
+### Features
+
+* support Next.JS version 14 ([#29558](https://github.com/cypress-io/cypress/issues/29558)) ([cf6b29d](https://github.com/cypress-io/cypress/commit/cf6b29db229cc825f27fd78e7baeafaa16576f9a))
+
+# [@cypress/webpack-dev-server-v3.8.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.7.4...@cypress/webpack-dev-server-v3.8.0) (2024-04-18)
+
+
+### Features
+
+* support webpack-dev-server v5 in @cypress/webpack-dev-server ([#29306](https://github.com/cypress-io/cypress/issues/29306)) ([d7e9d60](https://github.com/cypress-io/cypress/commit/d7e9d6068c6ab01ab58f9959ea7ad6a361087764))
+
+# [@cypress/webpack-dev-server-v3.7.4](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.7.3...@cypress/webpack-dev-server-v3.7.4) (2024-01-30)
+
+
+### Bug Fixes
+
+* optimize reduce addCypressToWebpackEslintRulesInPlace ([#27819](https://github.com/cypress-io/cypress/issues/27819)) ([43792e7](https://github.com/cypress-io/cypress/commit/43792e7583651318ea4653fce914a16b9fd5ae48))
+
+# [@cypress/webpack-dev-server-v3.7.3](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.7.2...@cypress/webpack-dev-server-v3.7.3) (2024-01-12)
+
+# [@cypress/webpack-dev-server-v3.7.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.7.1...@cypress/webpack-dev-server-v3.7.2) (2023-12-26)
+
+# [@cypress/webpack-dev-server-v3.7.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.7.0...@cypress/webpack-dev-server-v3.7.1) (2023-11-22)
+
+
+### Bug Fixes
+
+* Allow absolute paths in indexHtmlFile ([#28324](https://github.com/cypress-io/cypress/issues/28324)) ([dcd6a18](https://github.com/cypress-io/cypress/commit/dcd6a18d9b43707a240101696e7b718f97380149))
+
+# [@cypress/webpack-dev-server-v3.7.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.6.1...@cypress/webpack-dev-server-v3.7.0) (2023-11-07)
+
+
+### Features
+
+* add support for angular 17 ([#28152](https://github.com/cypress-io/cypress/issues/28152)) ([e8fc268](https://github.com/cypress-io/cypress/commit/e8fc26895354366211ace7e6550fe38c348c28bd))
+
+# [@cypress/webpack-dev-server-v3.6.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.6.0...@cypress/webpack-dev-server-v3.6.1) (2023-09-07)
+
+# [@cypress/webpack-dev-server-v3.6.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.5.3...@cypress/webpack-dev-server-v3.6.0) (2023-09-07)
+
+
+### Features
+
+* **webpack-dev-server:** update the generated tsconfig path for angular CT ([#27723](https://github.com/cypress-io/cypress/issues/27723)) ([264a118](https://github.com/cypress-io/cypress/commit/264a118e4858ea6bc401d71895b09f656a4dc938))
+
+# [@cypress/webpack-dev-server-v3.5.3](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.5.2...@cypress/webpack-dev-server-v3.5.3) (2023-08-29)
+
+
+### Bug Fixes
+
+* allow cypress config.port to override devServer.port for proxying assets ([f82fdf0](https://github.com/cypress-io/cypress/commit/f82fdf026eeab125a2b974e4257a7ac5e33640eb))
+
+# [@cypress/webpack-dev-server-v3.5.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.5.1...@cypress/webpack-dev-server-v3.5.2) (2023-08-04)
+
+
+### Bug Fixes
+
+* **cypress/webpack-dev-server:** correct path for `indexHtmlFile` ([#27320](https://github.com/cypress-io/cypress/issues/27320)) ([53fd537](https://github.com/cypress-io/cypress/commit/53fd537a0486caedc7faccacff7c6433ebc2601f))
+
+# [@cypress/webpack-dev-server-v3.5.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.5.0...@cypress/webpack-dev-server-v3.5.1) (2023-07-18)
+
+
+### Bug Fixes
+
+* **webpack-dev-server:** add typeRoots to generated tsconfig for angular ([#27117](https://github.com/cypress-io/cypress/issues/27117)) ([376795f](https://github.com/cypress-io/cypress/commit/376795f125054c4a70cb1a9b75b01c1a42cccf93))
+
+# [@cypress/webpack-dev-server-v3.5.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.4.1...@cypress/webpack-dev-server-v3.5.0) (2023-06-26)
+
+
+### Features
+
+* support Angular 16.1 ([#27106](https://github.com/cypress-io/cypress/issues/27106)) ([0055214](https://github.com/cypress-io/cypress/commit/0055214bf1b130796a038a73a659f5e714c77813))
+
+# [@cypress/webpack-dev-server-v3.4.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.4.0...@cypress/webpack-dev-server-v3.4.1) (2023-04-07)
+
+
+### Bug Fixes
+
+* correctly pass resolvedBaseUrl for Next.js 13.2.0+ ([#26399](https://github.com/cypress-io/cypress/issues/26399)) ([e8390f4](https://github.com/cypress-io/cypress/commit/e8390f46cd852417f2c0b07a9c73eeaf7437e823))
+
+# [@cypress/webpack-dev-server-v3.4.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.3.1...@cypress/webpack-dev-server-v3.4.0) (2023-03-20)
+
+
+### Features
+
+* support custom workspaceRoot for angular CT ([#26030](https://github.com/cypress-io/cypress/issues/26030)) ([ea8173f](https://github.com/cypress-io/cypress/commit/ea8173f6d9bc41657987349abcff44f7d14d1777))
+
+# [@cypress/webpack-dev-server-v3.3.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.3.0...@cypress/webpack-dev-server-v3.3.1) (2023-03-14)
+
+
+### Bug Fixes
+
+* **webpack-dev-server:** Pass in jsconfig to get webpack config for Next.js >= 13.2.1 ([#26005](https://github.com/cypress-io/cypress/issues/26005)) ([a9ab4c7](https://github.com/cypress-io/cypress/commit/a9ab4c7527dffd37ea81f4b4a0c7e40426853a99))
+
+# [@cypress/webpack-dev-server-v3.3.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.2.4...@cypress/webpack-dev-server-v3.3.0) (2023-02-21)
+
+
+### Features
+
+* Public API for CT Framework Definitions ([#25780](https://github.com/cypress-io/cypress/issues/25780)) ([1d3aab9](https://github.com/cypress-io/cypress/commit/1d3aab9d70acbce6d3571ab5b9df771f1c455964)), closes [#25713](https://github.com/cypress-io/cypress/issues/25713)
+
+# [@cypress/webpack-dev-server-v3.2.4](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.2.3...@cypress/webpack-dev-server-v3.2.4) (2023-02-20)
+
+
+### Bug Fixes
+
+* **webpack-dev-server:** touch component-index during onSpecsChange to avoid writing to app file ([#25861](https://github.com/cypress-io/cypress/issues/25861)) ([87816de](https://github.com/cypress-io/cypress/commit/87816de1b7c4c3873ad791d71ac2af5aaa88e889))
+
+# [@cypress/webpack-dev-server-v3.2.3](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.2.2...@cypress/webpack-dev-server-v3.2.3) (2023-01-24)
+
+
+### Bug Fixes
+
+* Extend mock logger used in angular bootstrap ([#25500](https://github.com/cypress-io/cypress/issues/25500)) ([fdd402f](https://github.com/cypress-io/cypress/commit/fdd402fee2d3eb46150e8e785556607045016aa8))
+
+# [@cypress/webpack-dev-server-v3.2.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.2.1...@cypress/webpack-dev-server-v3.2.2) (2023-01-03)
+
+
+### Bug Fixes
+
+* change wording for spec creation ([#25271](https://github.com/cypress-io/cypress/issues/25271)) ([c12a7e3](https://github.com/cypress-io/cypress/commit/c12a7e37c73d972eb0514e4b602940df210d86c7))
+
+# [@cypress/webpack-dev-server-v3.2.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.2.0...@cypress/webpack-dev-server-v3.2.1) (2022-12-29)
+
+
+### Bug Fixes
+
+* Allow component tests with special characters in filepath ([#25299](https://github.com/cypress-io/cypress/issues/25299)) ([dc78750](https://github.com/cypress-io/cypress/commit/dc7875064bc1ff0193d1f46ef9411f753cf39600))
+
+# [@cypress/webpack-dev-server-v3.2.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.1.2...@cypress/webpack-dev-server-v3.2.0) (2022-12-19)
+
+
+### Features
+
+* create from React component ([#25168](https://github.com/cypress-io/cypress/issues/25168)) ([166b694](https://github.com/cypress-io/cypress/commit/166b69414c5e347ef825c121330b0b561a4caa3b)), closes [#24881](https://github.com/cypress-io/cypress/issues/24881) [#24954](https://github.com/cypress-io/cypress/issues/24954) [#24982](https://github.com/cypress-io/cypress/issues/24982) [#25079](https://github.com/cypress-io/cypress/issues/25079) [#25145](https://github.com/cypress-io/cypress/issues/25145)
+
+# [@cypress/webpack-dev-server-v3.1.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.1.1...@cypress/webpack-dev-server-v3.1.2) (2022-12-16)
+
+
+### Bug Fixes
+
+* use srcRoot for angular build context ([#25090](https://github.com/cypress-io/cypress/issues/25090)) ([7c36118](https://github.com/cypress-io/cypress/commit/7c361187e31c3681f415da8a9073221d807987f6))
+
+# [@cypress/webpack-dev-server-v3.1.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.1.0...@cypress/webpack-dev-server-v3.1.1) (2022-12-08)
+
+
+### Bug Fixes
+
+* add v8 snapshot usage to cypress in cypress testing ([#24860](https://github.com/cypress-io/cypress/issues/24860)) ([c540284](https://github.com/cypress-io/cypress/commit/c540284f5080d46a8597e53dd2213cb6fb133078))
+
+# [@cypress/webpack-dev-server-v3.1.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.0.1...@cypress/webpack-dev-server-v3.1.0) (2022-11-10)
+
+
+### Features
+
+* add support for next 13 ([#24396](https://github.com/cypress-io/cypress/issues/24396)) ([cc4244d](https://github.com/cypress-io/cypress/commit/cc4244dd5d10d743389192dee6ded68d28c72665))
+
+# [@cypress/webpack-dev-server-v3.0.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v3.0.0...@cypress/webpack-dev-server-v3.0.1) (2022-11-08)
+
+
+### Bug Fixes
+
+* revert dynamic import of webpack config file ([#24598](https://github.com/cypress-io/cypress/issues/24598)) ([69f7dab](https://github.com/cypress-io/cypress/commit/69f7dabc94a5adb25edc7fda6057e92b8bd2e072))
+
 # [@cypress/webpack-dev-server-v3.0.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-dev-server-v2.5.0...@cypress/webpack-dev-server-v3.0.0) (2022-11-07)
 
 

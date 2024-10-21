@@ -2,13 +2,13 @@
   <div
     id="spec-runner-header"
     ref="autHeaderEl"
-    class="min-h-64px text-14px"
+    class="min-h-[64px] text-[14px]"
   >
-    <div class="flex flex-wrap flex-grow p-16px gap-12px justify-end">
+    <div class="flex flex-wrap grow p-[16px] gap-[12px] justify-end">
       <div
         v-if="props.gql.currentTestingType === 'e2e'"
         data-cy="aut-url"
-        class="border rounded flex flex-grow border-gray-100 border-1px h-32px overflow-hidden align-middle"
+        class="border rounded flex grow border-gray-100 h-[32px] overflow-hidden align-middle"
         :class="{
           'bg-gray-50': autStore.isLoadingUrl
         }"
@@ -16,7 +16,7 @@
         <Button
           data-cy="playground-activator"
           :disabled="isDisabled"
-          class="rounded-none border-gray-100 border-r-1px mr-12px"
+          class="rounded-none border-gray-100 border-r-[1px] mr-[12px]"
           variant="text"
           :aria-label="t('runner.selectorPlayground.toggle')"
           @click="togglePlayground"
@@ -25,12 +25,12 @@
         </Button>
         <input
           ref="autUrlInputRef"
-          target="_blank"
           :value="studioStore.needsUrl ? urlInProgress : autUrl"
           data-cy="aut-url-input"
-          class="flex flex-grow mr-12px leading-normal max-w-100% text-indigo-500 z-51 self-center hocus-link-default truncate"
+          aria-label="url of the application under test"
+          class="flex grow mr-[12px] leading-normal max-w-full text-indigo-500 z-51 self-center hocus-link-default truncate"
           @input="setStudioUrl"
-          @click="openInNewTab"
+          @click="openExternally"
           @keyup.enter="visitUrl"
         >
         <StudioUrlPrompt
@@ -44,12 +44,12 @@
 
       <div
         v-else
-        class="flex-grow"
+        class="grow"
       >
         <Button
           data-cy="playground-activator"
           :disabled="isDisabled"
-          class="border-gray-100 mr-12px"
+          class="border-gray-100 mr-[12px]"
           variant="outline"
           :aria-label="t('runner.selectorPlayground.toggle')"
           @click="togglePlayground"
@@ -64,7 +64,7 @@
       >
         <template #heading>
           <img
-            class="min-w-16px w-16px"
+            class="min-w-[16px] w-[16px]"
             :src="allBrowsersIcons[selectedBrowser.displayName] || allBrowsersIcons.generic"
             :alt="selectedBrowser.displayName"
           >
@@ -72,7 +72,7 @@
         </template>
 
         <template #default>
-          <div class="max-h-50vh overflow-auto">
+          <div class="max-h-[50vh] overflow-auto">
             <VerticalBrowserListItems
               :gql="props.gql"
               :spec-path="activeSpecPath"
@@ -89,17 +89,17 @@
           <span class="whitespace-nowrap">{{ autStore.viewportWidth }}x{{ autStore.viewportHeight }}</span>
           <span
             v-if="displayScale"
-            class="-ml-6px text-gray-500"
+            class="ml-[-6px] text-gray-500"
           >
             ({{ displayScale }})
           </span>
         </template>
         <template #default>
-          <div class="max-h-50vw p-24px pt-5 text-gray-700 leading-5 w-346px overflow-auto">
+          <div class="max-h-50vw p-[24px] pt-5 text-gray-700 leading-5 w-[346px] overflow-auto">
             <i18n-t
               tag="p"
               keypath="runner.viewportTooltip.infoText"
-              class="mb-24px"
+              class="mb-[24px]"
             >
               <strong class="font-bold">{{ autStore.defaultViewportWidth }}px</strong>
               <strong class="font-bold">{{ autStore.defaultViewportHeight }}px</strong>
@@ -109,7 +109,7 @@
             <i18n-t
               tag="p"
               keypath="runner.viewportTooltip.configText"
-              class="mb-24px"
+              class="mb-[24px]"
             >
               <template #configFile>
                 <!-- disable rule to prevent trailing space from being added to <InlineCodeFragment/> content -->
@@ -153,8 +153,8 @@
       dismissible
     >
       <template #title>
-        <ExternalLink href="https://on.cypress.io/mount">
-          <i-cy-book_x16 class="inline-block icon-dark-indigo-500 icon-light-indigo-200" />
+        <i-cy-book_x16 class="pr-[2px] inline-block icon-dark-indigo-500 icon-light-indigo-200" />
+        <ExternalLink href="https://on.cypress.io/styling-components">
           {{ t('runner.header.reviewDocs') }}
         </ExternalLink>
         {{ t('runner.header.troubleRendering') }}
@@ -186,6 +186,7 @@ import SpecRunnerDropdown from './SpecRunnerDropdown.vue'
 import { allBrowsersIcons } from '@packages/frontend-shared/src/assets/browserLogos'
 import BookIcon from '~icons/cy/book_x16'
 import { useStudioStore } from '../store/studio-store'
+import { useExternalLink } from '@cy/gql-components/useExternalLink'
 
 gql`
 fragment SpecRunnerHeader on CurrentProject {
@@ -255,6 +256,8 @@ const activeSpecPath = specStore.activeSpec?.absolute
 
 const isDisabled = computed(() => autStore.isRunning || autStore.isLoading)
 
+const openExternal = useExternalLink()
+
 function setStudioUrl (event: Event) {
   const url = (event.currentTarget as HTMLInputElement).value
 
@@ -265,11 +268,11 @@ function visitUrl () {
   studioStore.visitUrl(urlInProgress.value)
 }
 
-function openInNewTab () {
+function openExternally () {
   if (!autStore.url || studioStore.isActive) {
     return
   }
 
-  window.open(autStore.url, '_blank')?.focus()
+  openExternal(autStore.url)
 }
 </script>

@@ -25,12 +25,12 @@ export interface CodeFrame extends FileDetails {
 export interface ErrProps {
   name: string
   message: string
+  isRecovered: boolean
   stack: string
   parsedStack: ParsedStackLine[]
   docsUrl: string | string[]
   templateType: string
   codeFrame: CodeFrame
-  isRecovered: boolean
 }
 
 export default class Err {

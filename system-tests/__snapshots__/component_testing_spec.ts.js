@@ -17,7 +17,7 @@ exports['React major versions with Webpack executes all of the tests for React v
 ────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                     
   Running:  App.cy.jsx                                                                      (1 of 5)
-   49 modules
+   53 modules
 
 
   ✓ renders hello world
@@ -35,16 +35,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     App.cy.jsx                                                                       │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/App.cy.jsx.mp4                      (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -72,16 +66,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Unmount.cy.jsx                                                                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Unmount.cy.jsx.mp4                  (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -105,16 +93,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     UsingLegacyMount.cy.jsx                                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/UsingLegacyMount.cy.jsx.mp4         (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -138,16 +120,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Rerendering.cy.jsx                                                               │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Rerendering.cy.jsx.mp4              (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -174,16 +150,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     mount.cy.jsx                                                                     │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/mount.cy.jsx.mp4                    (X second)
 
 
 ====================================================================================================
@@ -227,7 +197,7 @@ exports['React major versions with Webpack executes all of the tests for React v
 ────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                     
   Running:  App.cy.jsx                                                                      (1 of 5)
-   46 modules
+   50 modules
 
 
   ✓ renders hello world
@@ -245,16 +215,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     App.cy.jsx                                                                       │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/App.cy.jsx.mp4                      (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -282,16 +246,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Unmount.cy.jsx                                                                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Unmount.cy.jsx.mp4                  (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -315,16 +273,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     UsingLegacyMount.cy.jsx                                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/UsingLegacyMount.cy.jsx.mp4         (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -348,16 +300,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Rerendering.cy.jsx                                                               │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Rerendering.cy.jsx.mp4              (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -384,16 +330,10 @@ exports['React major versions with Webpack executes all of the tests for React v
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     mount.cy.jsx                                                                     │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/mount.cy.jsx.mp4                    (X second)
 
 
 ====================================================================================================
@@ -454,16 +394,10 @@ exports['React major versions with Vite executes all of the tests for React v17 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     App.cy.jsx                                                                       │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/App.cy.jsx.mp4                      (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -491,16 +425,10 @@ exports['React major versions with Vite executes all of the tests for React v17 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Unmount.cy.jsx                                                                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Unmount.cy.jsx.mp4                  (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -524,16 +452,10 @@ exports['React major versions with Vite executes all of the tests for React v17 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     UsingLegacyMount.cy.jsx                                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/UsingLegacyMount.cy.jsx.mp4         (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -557,16 +479,10 @@ exports['React major versions with Vite executes all of the tests for React v17 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Rerendering.cy.jsx                                                               │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Rerendering.cy.jsx.mp4              (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -593,16 +509,10 @@ exports['React major versions with Vite executes all of the tests for React v17 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     mount.cy.jsx                                                                     │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/mount.cy.jsx.mp4                    (X second)
 
 
 ====================================================================================================
@@ -663,16 +573,10 @@ exports['React major versions with Vite executes all of the tests for React v18 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     App.cy.jsx                                                                       │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/App.cy.jsx.mp4                      (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -700,16 +604,10 @@ exports['React major versions with Vite executes all of the tests for React v18 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Unmount.cy.jsx                                                                   │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Unmount.cy.jsx.mp4                  (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -733,16 +631,10 @@ exports['React major versions with Vite executes all of the tests for React v18 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     UsingLegacyMount.cy.jsx                                                          │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/UsingLegacyMount.cy.jsx.mp4         (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -766,16 +658,10 @@ exports['React major versions with Vite executes all of the tests for React v18 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     Rerendering.cy.jsx                                                               │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/Rerendering.cy.jsx.mp4              (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -802,16 +688,10 @@ exports['React major versions with Vite executes all of the tests for React v18 
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     mount.cy.jsx                                                                     │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/mount.cy.jsx.mp4                    (X second)
 
 
 ====================================================================================================
@@ -898,7 +778,7 @@ exports['experimentalSingleTabRunMode / executes all specs in a single tab'] = `
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  2                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     1_fails.cy.js                                                                    │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -906,16 +786,10 @@ exports['experimentalSingleTabRunMode / executes all specs in a single tab'] = `
 
   (Screenshots)
 
-  -  /XXX/XXX/XXX/cypress/screenshots/1_fails.cy.js/simple failing spec -- fails (fai     (1280x720)
+  -  /XXX/XXX/XXX/cypress/screenshots/1_fails.cy.js/simple failing spec -- fails (fai     (1280x581)
      led).png                                                                                       
-  -  /XXX/XXX/XXX/cypress/screenshots/1_fails.cy.js/simple failing spec -- fails agai     (1280x720)
+  -  /XXX/XXX/XXX/cypress/screenshots/1_fails.cy.js/simple failing spec -- fails agai     (1280x581)
      n (failed).png                                                                                 
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/1_fails.cy.js.mp4                   (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -939,16 +813,10 @@ exports['experimentalSingleTabRunMode / executes all specs in a single tab'] = `
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     2_foo.cy.js                                                                      │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/2_foo.cy.js.mp4                     (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -973,16 +841,10 @@ exports['experimentalSingleTabRunMode / executes all specs in a single tab'] = `
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     3_retries.cy.js                                                                  │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/3_retries.cy.js.mp4                 (X second)
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1004,16 +866,10 @@ exports['experimentalSingleTabRunMode / executes all specs in a single tab'] = `
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     999_final.cy.js                                                                  │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/999_final.cy.js.mp4                 (X second)
 
 
 ====================================================================================================

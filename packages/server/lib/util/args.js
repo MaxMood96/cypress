@@ -14,6 +14,7 @@ const nestedArraysInSquareBracketsRe = /\[(.+?)\]/g
 const everythingAfterFirstEqualRe = /=(.*)/
 
 const allowList = [
+  'autoCancelAfterFailures',
   'apiKey',
   'appPath',
   'browser',
@@ -44,6 +45,8 @@ const allowList = [
   'reporterOptions',
   'returnPkg',
   'runMode',
+  'runnerUi',
+  'noRunnerUi',
   'runProject',
   'smokeTest',
   'spec',
@@ -348,6 +351,7 @@ module.exports = {
     const alias = {
       'api-key': 'apiKey',
       'app-path': 'appPath',
+      'auto-cancel-after-failures': 'autoCancelAfterFailures',
       'ci-build-id': 'ciBuildId',
       'config-file': 'configFile',
       'exec-path': 'execPath',
@@ -357,6 +361,7 @@ module.exports = {
       'proxy-source': 'proxySource',
       'reporter-options': 'reporterOptions',
       'return-pkg': 'returnPkg',
+      'runner-ui': 'runnerUi',
       'run-mode': 'isTextTerminal',
       'run-project': 'runProject',
       'smoke-test': 'smokeTest',
@@ -407,7 +412,7 @@ module.exports = {
     }
 
     let { spec } = options
-    const { env, config, reporterOptions, outputPath, tag, testingType } = options
+    const { env, config, reporterOptions, outputPath, tag, testingType, autoCancelAfterFailures } = options
     let project = options.project || options.runProject
 
     // only accept project if it is a string
@@ -446,6 +451,10 @@ module.exports = {
 
         return errors.throwErr('COULD_NOT_PARSE_ARGUMENTS', 'spec', spec, 'spec must be a string or comma-separated list')
       }
+    }
+
+    if (autoCancelAfterFailures && !((typeof autoCancelAfterFailures === 'number' && Number.isInteger(autoCancelAfterFailures)) || autoCancelAfterFailures === false)) {
+      return errors.throwErr('COULD_NOT_PARSE_ARGUMENTS', 'auto-cancel-after-failures', autoCancelAfterFailures, 'auto-cancel-after-failures must be an integer or false')
     }
 
     if (tag) {

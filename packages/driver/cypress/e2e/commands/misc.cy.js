@@ -10,6 +10,11 @@ describe('src/cy/commands/misc', () => {
     it('nulls out the subject', () => {
       cy.noop({}).end().then((subject) => {
         expect(subject).to.be.null
+
+        // We want cy.end() to break the subject chain - any previous entries
+        // (in this case `{}`) should be discarded. No re-running any previous
+        // query functions once you've used `.end()` on a chain.
+        expect(cy.subjectChain()).to.eql([null])
       })
     })
   })
@@ -18,6 +23,11 @@ describe('src/cy/commands/misc', () => {
     it('nulls out the subject', () => {
       cy.wrap({}).log('foo').then((subject) => {
         expect(subject).to.be.null
+
+        // We want cy.end() to break the subject chain - any previous entries
+        // (in this case `{}`) should be discarded. No re-running any previous
+        // query functions once you've used `.end()` on a chain.
+        expect(cy.subjectChain()).to.eql([null])
       })
     })
 
@@ -35,16 +45,19 @@ describe('src/cy/commands/misc', () => {
 
       it('logs immediately', function (done) {
         cy.on('log:added', (attrs, log) => {
-          cy.removeAllListeners('log:added')
+          if (log.get('name') === 'log') {
+            cy.removeAllListeners('log:added')
 
-          expect(log.get('message')).to.eq('foo, {foo: bar}')
-          expect(log.get('name')).to.eq('log')
-          expect(log.get('end')).to.be.true
+            expect(log.get('message')).to.eq('foo, {foo: bar}')
+            expect(log.get('end')).to.be.true
 
-          done()
+            done()
+          }
         })
 
-        cy.log('foo', { foo: 'bar' }).then(() => {
+        // Query the 'body' here to verify that .log()
+        // ignores the previous subject and logs only its arguments.
+        cy.get('body').log('foo', { foo: 'bar' }).then(() => {
           const { lastLog } = this
 
           expect(lastLog.get('ended')).to.be.true
@@ -57,9 +70,12 @@ describe('src/cy/commands/misc', () => {
       it('consoleProps', () => {
         return cy.log('foobarbaz', [{}]).then(function () {
           expect(this.lastLog.invoke('consoleProps')).to.deep.eq({
-            Command: 'log',
+            name: 'log',
+            type: 'command',
             args: [[{}]],
-            message: 'foobarbaz',
+            props: {
+              message: 'foobarbaz',
+            },
           })
         })
       })
@@ -223,15 +239,12 @@ describe('src/cy/commands/misc', () => {
             this.logs.push(log)
           }
         })
-
-        return null
       })
 
       it('throws when wrapping an array of windows', (done) => {
         cy.on('fail', (err) => {
-          expect(err.message).to.include('`cy.scrollTo()` failed because it requires a DOM element.')
+          expect(err.message).to.include('`cy.scrollTo()` failed because it requires a DOM element or window.')
           expect(err.message).to.include('[<window>]')
-          expect(err.message).to.include('All 2 subject validations failed on this subject.')
 
           done()
         })
@@ -243,9 +256,8 @@ describe('src/cy/commands/misc', () => {
 
       it('throws when wrapping an array of documents', (done) => {
         cy.on('fail', (err) => {
-          expect(err.message).to.include('`cy.screenshot()` failed because it requires a DOM element.')
+          expect(err.message).to.include('`cy.screenshot()` failed because it requires a DOM element, window or document.')
           expect(err.message).to.include('[<document>]')
-          expect(err.message).to.include('All 3 subject validations failed on this subject.')
 
           done()
         })
@@ -319,8 +331,35 @@ describe('src/cy/commands/misc', () => {
           this.lastLog = log
           this.logs.push(log)
         })
+      })
 
-        return null
+      it('can turn off logging when protocol is disabled', { protocolEnabled: false }, function () {
+        cy.on('_log:added', (attrs, log) => {
+          this.hiddenLog = log
+        })
+
+        cy.wrap('', { log: false }).then(() => {
+          const { lastLog, hiddenLog } = this
+
+          expect(lastLog).to.be.undefined
+          expect(hiddenLog).to.be.undefined
+        })
+      })
+
+      it('can send hidden log when protocol is enabled', { protocolEnabled: true }, function () {
+        cy.on('_log:added', (attrs, log) => {
+          this.hiddenLog = log
+        })
+
+        cy.wrap('', { log: false }).then(() => {
+          const { lastLog, hiddenLog } = this
+
+          expect(lastLog).to.be.undefined
+
+          expect(hiddenLog.get('name')).to.eq('wrap')
+          expect(hiddenLog.get('hidden')).to.be.true
+          expect(hiddenLog.get('snapshots').length, 'log snapshot length').to.eq(1)
+        })
       })
 
       it('logs immediately', function (done) {

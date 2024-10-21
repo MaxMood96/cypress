@@ -9,9 +9,14 @@ const onServer = (app) => {
 describe('e2e baseUrl', () => {
   context('https', () => {
     systemTests.setup({
+      servers: {
+        port: 443,
+        https: true,
+        onServer,
+      },
       settings: {
         e2e: {
-          baseUrl: 'https://httpbin.org',
+          baseUrl: 'https://localhost/app',
         },
       },
     })
@@ -19,6 +24,42 @@ describe('e2e baseUrl', () => {
     systemTests.it('passes', {
       spec: 'base_url.cy.js',
       snapshot: true,
+    })
+  })
+
+  context('https basic auth', () => {
+    systemTests.setup({
+      servers: {
+        port: 443,
+        https: true,
+        onServer,
+      },
+      settings: {
+        e2e: {
+          baseUrl: 'https://test:test@localhost/app',
+        },
+      },
+    })
+
+    systemTests.it('passes', {
+      spec: 'base_url.cy.js',
+      browser: 'chrome',
+      snapshot: true,
+    })
+  })
+
+  // https://github.com/cypress-io/cypress/issues/28336
+  context('basic auth + privileged commands', () => {
+    systemTests.setup({
+      servers: {
+        port: 9999,
+        onServer,
+      },
+    })
+
+    systemTests.it('passes', {
+      browser: 'chrome',
+      project: 'privileged-commands',
     })
   })
 

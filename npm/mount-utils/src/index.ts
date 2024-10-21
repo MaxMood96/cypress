@@ -44,8 +44,20 @@ export function setupHooks (optionalCallback?: Function) {
     )
   })
 
+  Cypress.Commands.overwrite('session', () => {
+    throw new Error(
+      'cy.session from a component spec is not allowed',
+    )
+  })
+
+  Cypress.Commands.overwrite('origin', () => {
+    throw new Error(
+      'cy.origin from a component spec is not allowed',
+    )
+  })
+
   // @ts-ignore
-  Cypress.on('test:before:run', () => {
+  Cypress.on('test:before:after:run:async', () => {
     optionalCallback?.()
   })
 }

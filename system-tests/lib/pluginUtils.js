@@ -5,9 +5,9 @@ module.exports = {
     if (browser.family === 'firefox') {
       // this is needed to ensure correct error screenshot / video recording
       // resolution of exactly 1280x720
-      // (height must account for firefox url bar, which we can only shrink to 1px)
+      // (height must account for firefox url bar, which we can only shrink to 2px)
       options.args.push(
-        '-width', '1280', '-height', '721',
+        '-width', '1280', '-height', '722',
       )
     } else if (browser.name === 'electron') {
       options.preferences.width = 1280

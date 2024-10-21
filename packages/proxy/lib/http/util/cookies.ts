@@ -3,8 +3,9 @@ import type Debug from 'debug'
 import { URL } from 'url'
 import { cors } from '@packages/network'
 import { urlOriginsMatch, urlSameSiteMatch } from '@packages/network/lib/cors'
-import { AutomationCookie, Cookie, CookieJar, toughCookieToAutomationCookie } from '@packages/server/lib/util/cookies'
-import type { RequestCredentialLevel, RequestResourceType } from '../../types'
+import { SerializableAutomationCookie, Cookie, CookieJar, toughCookieToAutomationCookie } from '@packages/server/lib/util/cookies'
+import type { RequestCredentialLevel } from '../../types'
+import type { ResourceType } from 'cypress/types/net-stubbing'
 
 type SiteContext = 'same-origin' | 'same-site' | 'cross-site'
 
@@ -12,7 +13,7 @@ interface RequestDetails {
   url: string
   isAUTFrame: boolean
   doesTopNeedSimulating: boolean
-  resourceType?: RequestResourceType
+  resourceType?: ResourceType
   credentialLevel?: RequestCredentialLevel
 }
 
@@ -23,13 +24,13 @@ interface RequestDetails {
  * which is critical for lax cookies
  * @param {string} requestUrl - the url of the request
  * @param {string} AUTUrl - The current url of the app under test
- * @param {RequestResourceType} [resourceType] -
+ * @param {resourceType} [resourceType] - the request resourceType
  * @param {RequestCredentialLevel} [credentialLevel] - The credentialLevel of the request. For `fetch` this is `omit|same-origin|include` (defaults to same-origin)
  * and for `XmlHttpRequest` it is `true|false` (defaults to false)
  * @param {isAutFrame} [boolean] - whether or not the request is from the AUT Iframe or not
  * @returns {boolean}
  */
-export const shouldAttachAndSetCookies = (requestUrl: string, AUTUrl: string | undefined, resourceType?: RequestResourceType, credentialLevel?: RequestCredentialLevel, isAutFrame?: boolean): boolean => {
+export const shouldAttachAndSetCookies = (requestUrl: string, AUTUrl: string | undefined, resourceType?: ResourceType, credentialLevel?: RequestCredentialLevel, isAutFrame?: boolean): boolean => {
   if (!AUTUrl) return false
 
   const siteContext = calculateSiteContext(requestUrl, AUTUrl)
@@ -59,7 +60,7 @@ export const shouldAttachAndSetCookies = (requestUrl: string, AUTUrl: string | u
 
       return false
     default:
-      // if we cannot determine a resource level, we likely should store the cookie as it is a navigation or another event as long as the context is same-origin
+      // if we cannot determine a resource level or it isn't applicable,, we likely should store the cookie as it is a navigation or another event as long as the context is same-origin
       if (siteContext === 'same-origin' || isAutFrame) {
         return true
       }
@@ -197,7 +198,7 @@ export class CookiesHelper {
 
     const afterCookies = this.cookieJar.getAllCookies()
 
-    return afterCookies.reduce<AutomationCookie[]>((memo, afterCookie) => {
+    return afterCookies.reduce<SerializableAutomationCookie[]>((memo, afterCookie) => {
       if (matchesPreviousCookie(this.previousCookies, afterCookie)) return memo
 
       return memo.concat(toughCookieToAutomationCookie(afterCookie, this.defaultDomain))
@@ -220,7 +221,9 @@ export class CookiesHelper {
     // cross site cookies cannot set lax/strict cookies in the browser for xhr/fetch requests (but ok with navigation/document requests)
     // NOTE: This is allowable in firefox as the default cookie behavior is no_restriction (none). However, this shouldn't
     // impact what is happening in the server-side cookie jar as Set-Cookie is still called and firefox will allow it to be set in the browser
-    if (this.request.resourceType && this.siteContext === 'cross-site' && toughCookie.sameSite !== 'none') {
+    const isXhrOrFetchRequest = this.request.resourceType === 'fetch' || this.request.resourceType === 'xhr'
+
+    if (isXhrOrFetchRequest && this.siteContext === 'cross-site' && toughCookie.sameSite !== 'none') {
       this.debug(`cannot set cookie with SameSite=${toughCookie.sameSite} when site context is ${this.siteContext}`)
 
       return

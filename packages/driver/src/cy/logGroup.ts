@@ -5,13 +5,11 @@ import $errUtils from '../cypress/error_utils'
 export default (Cypress, userOptions: Cypress.LogGroup.Config, fn: Cypress.LogGroup.ApiCallback) => {
   const cy = Cypress.cy
 
-  const shouldEmitLog = userOptions.log === undefined ? true : userOptions.log
-
   const options: Cypress.InternalLogConfig = {
     ...userOptions,
     instrument: 'command',
     groupStart: true,
-    emitOnly: !shouldEmitLog,
+    hidden: userOptions.log === false,
   }
 
   const log = Cypress.log(options)
@@ -22,7 +20,7 @@ export default (Cypress, userOptions: Cypress.LogGroup.Config, fn: Cypress.LogGr
 
   // An internal command is inserted to create a divider between
   // commands inside group() callback and commands chained to it.
-  const restoreCmdIndex = cy.state('index') + 1
+  const restoreCmdIndex = cy.queue.index + 1
 
   const endLogGroupCmd = $Command.create({
     name: 'end-logGroup',

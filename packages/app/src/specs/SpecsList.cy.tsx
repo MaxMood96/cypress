@@ -5,16 +5,16 @@ import { defaultMessages } from '@cy/i18n'
 describe('<SpecsList />', { keystrokeDelay: 0 }, () => {
   let specs: Array<SpecsListFragment>
 
-  function mountWithTestingType (testingType: TestingTypeEnum | undefined, specFilter?: string) {
+  function mountWithTestingType ({ testingType, specFilter, experimentalRunAllSpecs }: { testingType?: TestingTypeEnum, specFilter?: string, experimentalRunAllSpecs?: boolean } = {}) {
     specs = []
     const showCreateSpecModalSpy = cy.spy().as('showCreateSpecModalSpy')
 
-    cy.mountFragment(Specs_SpecsListFragmentDoc, {
+    return cy.mountFragment(Specs_SpecsListFragmentDoc, {
       variableTypes: {
-        hasBranch: 'Boolean',
+        hasRunIds: 'Boolean',
       },
       variables: {
-        hasBranch: true,
+        hasRunIds: false,
       },
       onResult: (ctx) => {
         if (!ctx.currentProject) throw new Error('need current project')
@@ -28,10 +28,18 @@ describe('<SpecsList />', { keystrokeDelay: 0 }, () => {
           ctx.currentProject.savedState = { specFilter }
         }
 
+        if (experimentalRunAllSpecs) {
+          ctx.currentProject.config = [{ field: 'experimentalRunAllSpecs', value: true }]
+        }
+
         return ctx
       },
       render: (gqlVal) => {
-        return <SpecsList gql={gqlVal} onShowCreateSpecModal={showCreateSpecModalSpy} mostRecentUpdate={null} />
+        return (
+          <div class="h-[850px]">
+            <SpecsList gql={gqlVal} onShowCreateSpecModal={showCreateSpecModalSpy} mostRecentUpdate={null} />
+          </div>
+        )
       },
     })
   }
@@ -39,7 +47,7 @@ describe('<SpecsList />', { keystrokeDelay: 0 }, () => {
   context('when testingType is unset', () => {
     describe('with no saved filter', () => {
       beforeEach(() => {
-        mountWithTestingType(undefined)
+        mountWithTestingType({})
       })
 
       it('should filter specs', () => {
@@ -174,31 +182,12 @@ describe('<SpecsList />', { keystrokeDelay: 0 }, () => {
             })
           })
         })
-
-        it('displays the list as expected visually at various widths', () => {
-          cy.get('[data-cy="spec-list-file"]')
-          .should('have.length.above', 2)
-          .should('have.length.below', specs.length)
-
-          cy.wait(100) // there's an intentional 50ms delay in the code, lets just wait it out
-
-          cy.viewport(500, 850)
-          cy.percySnapshot('narrowest')
-          cy.viewport(650, 850)
-          cy.percySnapshot('narrow')
-          cy.viewport(800, 850)
-          cy.percySnapshot('medium')
-          cy.viewport(1200, 850)
-          cy.percySnapshot('wide')
-          cy.viewport(2000, 850)
-          cy.percySnapshot('widest')
-        })
       })
     })
 
     describe('with a saved spec filter', () => {
       beforeEach(() => {
-        mountWithTestingType(undefined, 'saved-search-term 🗑')
+        mountWithTestingType({ specFilter: 'saved-search-term 🗑' })
         cy.findByLabelText(defaultMessages.specPage.searchPlaceholder)
         .as('searchField')
 
@@ -263,21 +252,69 @@ describe('<SpecsList />', { keystrokeDelay: 0 }, () => {
 
   context('when testingType is e2e', () => {
     beforeEach(() => {
-      mountWithTestingType('e2e')
+      mountWithTestingType({ testingType: 'e2e' })
     })
 
     it('should display the e2e testing header', () => {
-      cy.findByTestId('specs-testing-type-header').should('have.text', 'E2E specs')
+      cy.findByTestId('specs-testing-type-header').within(() => {
+        cy.get('button[aria-selected="true"]').should('contain.text', 'E2E')
+      })
     })
   })
 
   context('when testingType is component', () => {
     beforeEach(() => {
-      mountWithTestingType('component')
+      mountWithTestingType({ testingType: 'component' })
     })
 
     it('should display the component testing header', () => {
-      cy.findByTestId('specs-testing-type-header').should('have.text', 'Component specs')
+      cy.findByTestId('specs-testing-type-header').within(() => {
+        cy.get('button[aria-selected="true"]').should('contain.text', 'Component')
+      })
+    })
+  })
+
+  describe('Run all Specs', () => {
+    const hoverRunAllSpecs = (directory: string, specNumber: number) => {
+      cy.contains('[data-cy=spec-item-directory]', directory).realHover().then(() => {
+        cy.get(`[data-cy="run-all-specs-for-${directory}"]`).should('contain.text', `Run ${specNumber} spec${specNumber > 1 ? 's' : ''}`)
+        cy.get('[data-cy="play-button"]').should('exist')
+      })
+    }
+
+    it('does not show feature unless experimentalRunAllSpecs is enabled', () => {
+      mountWithTestingType({ experimentalRunAllSpecs: false })
+
+      cy.contains('button', 'Run all specs').should('not.exist')
+      cy.contains('[data-cy=spec-item-directory]', '__test__').realHover()
+      cy.contains('button', 'Run 5 specs').should('not.exist')
+    })
+
+    it('displays runAllSpecs when hovering over a spec-list directory row', () => {
+      mountWithTestingType({ experimentalRunAllSpecs: true })
+      hoverRunAllSpecs('__test__', 5)
+      hoverRunAllSpecs('frontend', 11)
+      hoverRunAllSpecs('components', 6)
+
+      cy.percySnapshot()
+    })
+
+    it('checks if functionality works after a search', () => {
+      mountWithTestingType({ experimentalRunAllSpecs: true, specFilter: 'base' })
+      hoverRunAllSpecs('__test__', 2)
+      hoverRunAllSpecs('frontend/components', 2)
+      hoverRunAllSpecs('Cell/test', 1)
+    })
+
+    it('can tab into run-all', () => {
+      mountWithTestingType({ experimentalRunAllSpecs: true })
+      cy.get('[data-cy=run-all-specs-for-__test__]').should('not.be.visible')
+
+      cy.tabUntil(($el) => {
+        return $el.text().includes('Run 5 specs')
+      })
+
+      cy.get('[data-cy=run-all-specs-for-__test__]').should('be.visible')
     })
   })
 })

@@ -46,7 +46,9 @@ export default function (Commands, Cypress, cy, state, config) {
       animationDistanceThreshold: config('animationDistanceThreshold'),
     })
 
-    if (options.log) {
+    // if this instance is not present, create a log instance for cy.type()
+    // cy.clear passes in their log instance
+    if (!options._log) {
       // figure out the options which actually change the behavior of clicks
       const deltaOptions = $utils.filterOutOptions(options)
 
@@ -94,6 +96,7 @@ export default function (Commands, Cypress, cy, state, config) {
       options._log = Cypress.log({
         message: [chars, deltaOptions],
         $el: options.$el,
+        hidden: options.log === false,
         timeout: options.timeout,
         consoleProps () {
           return {
@@ -114,7 +117,7 @@ export default function (Commands, Cypress, cy, state, config) {
         },
       })
 
-      options._log!.snapshot('before', { next: 'after' })
+      options._log?.snapshot('before', { next: 'after' })
     }
 
     if (options.$el.length > 1) {
@@ -186,7 +189,10 @@ export default function (Commands, Cypress, cy, state, config) {
     }
 
     const type = function () {
+      const isFirefoxBefore91 = Cypress.isBrowser('firefox') && Cypress.browserMajorVersion() < 91
       const isFirefoxBefore98 = Cypress.isBrowser('firefox') && Cypress.browserMajorVersion() < 98
+      const isFirefox106OrLater = Cypress.isBrowser('firefox') && Cypress.browserMajorVersion() >= 106
+      const isFirefox129OrLater = Cypress.isBrowser('firefox') && Cypress.browserMajorVersion() >= 129
 
       const simulateSubmitHandler = function () {
         const form = options.$el.parents('form')
@@ -260,7 +266,7 @@ export default function (Commands, Cypress, cy, state, config) {
           // on the button will indeed trigger the form submit event
           // so we dont need to fire it manually anymore!
           if (!clickedDefaultButton(defaultButton)) {
-            // if we werent able to click the default button
+            // if we weren't able to click the default button
             // then synchronously fire the submit event
             // currently this is sync but if we use a waterfall
             // promise in the submit command it will break again
@@ -294,7 +300,7 @@ export default function (Commands, Cypress, cy, state, config) {
 
       const fireClickEvent = (el) => {
         const ctor = $dom.getDocumentFromElement(el).defaultView!.PointerEvent
-        const event = new ctor('click')
+        const event = new ctor('click', { composed: true })
 
         el.dispatchEvent(event)
       }
@@ -352,14 +358,16 @@ export default function (Commands, Cypress, cy, state, config) {
 
           if (
             (
-              // Before Firefox 98,
-              // Firefox sends a click event when the Space key is pressed.
-              // We don't want to send it twice.
+              // Before Firefox 91, it sends a click event automatically on the
+              // 'keyup' event for a Space key and we don't want to send it twice
               !Cypress.isBrowser('firefox') ||
-              // After Firefox 98,
-              // it sends a click event automatically if the element is a <button>,
-              // but it does not if the element is an <input>.
-              // event.target is null when used with shadow DOM.
+              // Starting with Firefox 91, click events are no longer sent
+              // automatically for <button> elements
+              // event.target is null when the element is within the shadow DOM
+              (!isFirefoxBefore91 && event.target && $elements.isButton(event.target)) ||
+              // Starting with Firefox 98, click events are no longer sent
+              // automatically for <input> elements
+              // event.target is null when the element is within the shadow DOM
               (!isFirefoxBefore98 && event.target && $elements.isInput(event.target))
             ) &&
             // Click event is sent after keyup event with space key.
@@ -378,9 +386,9 @@ export default function (Commands, Cypress, cy, state, config) {
 
             keydownEvents = []
 
-            // After Firefox 98,
+            // After Firefox 98 and before 129
             // Firefox doesn't update checkbox automatically even if the click event is sent.
-            if (Cypress.isBrowser('firefox')) {
+            if (Cypress.isBrowser('firefox') && !isFirefox129OrLater) {
               if (event.target.type === 'checkbox') {
                 event.target.checked = !event.target.checked
               } else if (event.target.type === 'radio') { // when checked is false, here cannot be reached because of the above condition
@@ -440,12 +448,17 @@ export default function (Commands, Cypress, cy, state, config) {
           // Send click event on type('{enter}')
           if (sendClickEvent) {
             if (
-              // Before Firefox 98, it sends a click event automatically.
+              // Before Firefox 98, it sends a click event automatically on
+              // simulated keypress events and we don't want to send it twice
               !Cypress.isBrowser('firefox') ||
-              // After Firefox 98,
-              // it sends a click event automatically if the element is a <button>
-              // it does not if the element is an <input>
-              (!isFirefoxBefore98 && $elements.isInput(el))) {
+              // Starting with Firefox 98, click events are no longer sent
+              // automatically for <input> elements, but are still sent for
+              // other element types
+              (!isFirefoxBefore98 && $elements.isInput(el)) ||
+              // Starting with Firefox 106, click events are no longer sent
+              // automatically for <button> elements
+              (isFirefox106OrLater && $elements.isButton(el))
+            ) {
               fireClickEvent(el)
             }
           }
@@ -475,6 +488,8 @@ export default function (Commands, Cypress, cy, state, config) {
         },
       })
     }
+
+    const subjectChain = cy.subjectChain()
 
     const handleFocused = function () {
       // if it's the body, don't need to worry about focus
@@ -509,6 +524,8 @@ export default function (Commands, Cypress, cy, state, config) {
       }
 
       return $actionability.verify(cy, options.$el, config, options, {
+        subjectFn: () => cy.getSubjectFromChain(subjectChain),
+
         onScroll ($el, type) {
           return Cypress.action('cy:scrolled', $el, type)
         },
@@ -527,7 +544,6 @@ export default function (Commands, Cypress, cy, state, config) {
           // cannot just call .focus, since children of contenteditable will not receive cursor
           // with .focus()
           return cy.now('click', $elToClick, {
-            $el: $elToClick,
             log: false,
             verify: false,
             _log: options._log,
@@ -536,6 +552,7 @@ export default function (Commands, Cypress, cy, state, config) {
             interval: options.interval,
             errorOnSelect: false,
             scrollBehavior: options.scrollBehavior,
+            subjectFn: () => $elToClick,
           })
           .then(() => {
             let activeElement = $elements.getActiveElByDocument($elToClick)
@@ -601,23 +618,22 @@ export default function (Commands, Cypress, cy, state, config) {
     const clear = function (el) {
       const $el = $dom.wrap(el)
 
-      if (options.log) {
-        // figure out the options which actually change the behavior of clicks
-        const deltaOptions = $utils.filterOutOptions(options)
+      // figure out the options which actually change the behavior of clicks
+      const deltaOptions = $utils.filterOutOptions(options)
 
-        options._log = Cypress.log({
-          message: deltaOptions,
-          $el,
-          timeout: options.timeout,
-          consoleProps () {
-            return {
-              'Applied To': $dom.getElements($el),
-              'Elements': $el.length,
-              'Options': deltaOptions,
-            }
-          },
-        })
-      }
+      options._log = Cypress.log({
+        message: deltaOptions,
+        $el,
+        hidden: options.log === false,
+        timeout: options.timeout,
+        consoleProps () {
+          return {
+            'Applied To': $dom.getElements($el),
+            'Elements': $el.length,
+            'Options': deltaOptions,
+          }
+        },
+      })
 
       const callTypeCmd = ($el) => {
         return cy.now('type', $el, '{selectall}{del}', {

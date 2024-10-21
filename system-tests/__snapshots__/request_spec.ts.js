@@ -46,16 +46,10 @@ exports['e2e requests / passes'] = `
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  0                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     request.cy.js                                                                    │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/request.cy.js.mp4                   (X second)
 
 
 ====================================================================================================
@@ -144,7 +138,7 @@ https://on.cypress.io/request
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  1                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     request_http_network_error_failing.cy.js                                         │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -154,13 +148,6 @@ https://on.cypress.io/request
 
   -  /XXX/XXX/XXX/cypress/screenshots/request_http_network_error_failing.cy.js/when n     (1280x720)
      etwork connection cannot be established -- fails (failed).png                                  
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/request_http_network_error_fail     (X second)
-                          ing.cy.js.mp4                                                             
 
 
 ====================================================================================================
@@ -263,7 +250,7 @@ https://on.cypress.io/request
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  1                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     request_status_code_failing.cy.js                                                │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -273,13 +260,6 @@ https://on.cypress.io/request
 
   -  /XXX/XXX/XXX/cypress/screenshots/request_status_code_failing.cy.js/when status c     (1280x720)
      ode isnt 2xx or 3xx -- fails (failed).png                                                      
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/request_status_code_failing.cy.     (X second)
-                          js.mp4                                                                    
 
 
 ====================================================================================================
@@ -390,7 +370,7 @@ https://on.cypress.io/request
   │ Pending:      0                                                                                │
   │ Skipped:      0                                                                                │
   │ Screenshots:  1                                                                                │
-  │ Video:        true                                                                             │
+  │ Video:        false                                                                            │
   │ Duration:     X seconds                                                                        │
   │ Spec Ran:     request_long_http_props_failing.cy.js                                            │
   └────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -400,13 +380,6 @@ https://on.cypress.io/request
 
   -  /XXX/XXX/XXX/cypress/screenshots/request_long_http_props_failing.cy.js/when stat     (1280x720)
      us code isnt 2xx or 3xx -- fails (failed).png                                                  
-
-
-  (Video)
-
-  -  Started processing:  Compressing to 32 CRF                                                     
-  -  Finished processing: /XXX/XXX/XXX/cypress/videos/request_long_http_props_failing     (X second)
-                          .cy.js.mp4                                                                
 
 
 ====================================================================================================

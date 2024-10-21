@@ -9,20 +9,20 @@
   >
     <NoInternetConnection
       v-if="!isOnline"
-      class="mt-24px"
+      class="mt-[24px]"
     >
       {{ t('launchpadErrors.noInternet.message') }}
     </NoInternetConnection>
     <div
       v-else
-      class="w-640px"
+      class="w-[640px]"
     >
       <Alert
         v-if="graphqlError"
         :v-model="Boolean(graphqlError)"
         status="error"
         :title="isInternalServerError ? t('runs.connect.errors.internalServerError.title') : t('runs.connect.errors.baseError.title')"
-        class="mb-16px"
+        class="mb-[16px]"
         :icon="WarningIcon"
         :dismissible="isInternalServerError"
       >
@@ -44,12 +44,16 @@
         :options="organizationOptions"
         item-value="name"
         item-key="id"
+        label-id="organization-label"
         :placeholder="orgPlaceholder"
         data-cy="selectOrganization"
       >
         <template #label>
-          <span class="flex font-normal my-8px text-16px leading-24px items-end justify-between">
-            <span class="">
+          <span class="flex font-normal my-[8px] text-[16px] leading-[24px] items-end justify-between">
+            <span
+              id="organization-label"
+              class=""
+            >
               {{ t('runs.connect.modal.selectProject.organization') }}
             </span>
             <ExternalLink
@@ -62,32 +66,36 @@
           </span>
         </template>
         <template #input-prefix>
-          <OrganizationIcon class="h-16px w-16px icon-dark-gray-500" />
+          <OrganizationIcon class="h-[16px] w-[16px] icon-dark-gray-500" />
         </template>
         <template #item-prefix>
-          <OrganizationIcon class="h-16px w-16px icon-dark-gray-500" />
+          <OrganizationIcon class="h-[16px] w-[16px] icon-dark-gray-500" />
         </template>
       </Select>
       <Select
         v-if="!newProject"
         v-model="pickedProject"
-        class="mt-16px transition-all"
+        class="mt-[16px] transition-all"
         :class="pickedOrganization ? undefined : 'opacity-50'"
         :options="projectOptions"
         item-value="name"
         item-key="id"
+        label-id="project-label"
         :disabled="!pickedOrganization"
         :placeholder="projectPlaceholder"
         data-cy="selectProject"
       >
         <template #label>
-          <div class="flex font-normal text-16px leading-24px items-center justify-between">
-            <p class="text-gray-800">
+          <div class="flex font-normal text-[16px] leading-[24px] items-center justify-between">
+            <p
+              id="project-label"
+              class="text-gray-800"
+            >
               {{ t('runs.connect.modal.selectProject.project') }}
               <span class="text-red-500">*</span>
             </p>
             <a
-              class="cursor-pointer my-8px text-right text-indigo-500 hover:underline"
+              class="cursor-pointer my-[8px] text-right text-indigo-500 hover:underline"
               @click="newProject = true"
             >
               {{ t('runs.connect.modal.selectProject.createNewProject') }}
@@ -95,25 +103,25 @@
           </div>
         </template>
         <template #input-prefix>
-          <FolderIcon class="h-16px w-16px icon-dark-gray-500" />
+          <FolderIcon class="h-[16px] w-[16px] icon-dark-gray-500" />
         </template>
         <template #item-prefix>
-          <FolderIcon class="h-16px w-16px icon-dark-gray-500" />
+          <FolderIcon class="h-[16px] w-[16px] icon-dark-gray-500" />
         </template>
       </Select>
       <template v-else>
         <div
-          class="flex font-normal mt-24px text-16px leading-24px items-center"
+          class="flex font-normal mt-[24px] text-[16px] leading-[24px] items-center"
         >
           <label
-            class="flex-grow"
+            class="grow"
             for="projectName"
           >
             <span class="text-gray-800">
               {{ t('runs.connect.modal.selectProject.projectName') }}
             </span>
-            <span class="ml-4px text-red-500">*</span>
-            <span class="ml-8px text-gray-500">
+            <span class="ml-[4px] text-red-500">*</span>
+            <span class="ml-[8px] text-gray-500">
               {{ t('runs.connect.modal.selectProject.projectNameDisclaimer') }}
             </span>
           </label>
@@ -128,8 +136,8 @@
         <Input
           id="projectName"
           v-model="projectName"
-          class="mt-8px"
-          input-classes="h-38px"
+          class="mt-[8px]"
+          input-classes="h-[38px]"
           :prefix-icon="FolderIcon"
           prefix-icon-classes="icon-dark-gray-500"
         />
@@ -156,7 +164,7 @@
       v-if="isOnline"
       #footer
     >
-      <div class="flex gap-16px">
+      <div class="flex gap-[16px]">
         <Button
           size="lg"
           :prefix-icon="newProject ? CreateIcon : ConnectIcon"
@@ -344,10 +352,12 @@ watch(projectOptions, (newVal, oldVal) => {
   }
 
   if (newVal.length === 1) {
-    pickedProject.value = projectOptions.value[0]
+    pickedProject.value = newVal[0]
   } else {
-    pickedProject.value = projectOptions.value.find((p) => p.name === projectName.value)
+    pickedProject.value = newVal.find((p) => p.name === projectName.value)
   }
+
+  newProject.value = newVal.length === 0
 }, {
   immediate: true,
 })

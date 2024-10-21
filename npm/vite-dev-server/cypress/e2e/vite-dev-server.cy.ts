@@ -3,39 +3,63 @@
 import dedent from 'dedent'
 
 describe('Config options', () => {
-  it('supports supportFile = false', () => {
-    cy.scaffoldProject('vite2.9.1-react')
-    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-no-support.config.ts'])
+  it('works with tailwind', () => {
+    cy.scaffoldProject('tailwind-vite')
+    cy.openProject('tailwind-vite', ['--component'])
     cy.startAppServer('component')
 
     cy.visitApp()
+    cy.specsPageIsVisible()
     cy.contains('App.cy.jsx').click()
     cy.waitForSpecToFinish()
     cy.get('.passed > .num').should('contain', 1)
+    cy.withCtx(async (ctx) => {
+      // Add a new spec with bg-blue-100 that asserts the style is correct
+      // If HMR + Tailwind is working properly, it'll pass.
+      await ctx.actions.file.writeFileInProject(
+        'src/App.cy.jsx', `
+        import React from 'react'
+        import { mount } from 'cypress/react18'
+
+        export const App = () => {
+          return (
+            <div className='bg-blue-100' id='hello'>
+              Hello
+            </div>
+          )
+        }
+
+        it('works', () => {
+          mount(<App />)
+          cy.get('#hello').should('have.css', 'background-color', 'rgb(219, 234, 254)')
+        })
+
+        it('dummy', () => {})
+        `,
+      )
+    })
+
+    cy.waitForSpecToFinish()
+    cy.get('.passed > .num').should('contain', 2)
   })
 
-  it('chooses new port when specified port is in use', () => {
+  it('supports supportFile = false', () => {
     cy.scaffoldProject('vite2.9.1-react')
-    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-port-in-use.config.ts'])
+    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-no-support.config.ts', '--component'])
     cy.startAppServer('component')
 
     cy.visitApp()
-
+    cy.specsPageIsVisible()
     cy.contains('App.cy.jsx').click()
-    cy.get('.passed > .num').should('contain', 2)
-
-    cy.withCtx(async (ctx) => {
-      const config = ctx.lifecycleManager.loadedFullConfig
-
-      expect(config.baseUrl).to.equal('http://localhost:3001')
-    })
+    cy.waitForSpecToFinish()
+    cy.get('.passed > .num').should('contain', 1)
   })
 
   it('supports serving files with whitespace', () => {
     const specWithWhitespace = 'spec with whitespace.cy.jsx'
 
     cy.scaffoldProject('vite2.9.1-react')
-    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite.config.ts'])
+    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite.config.ts', '--component'])
     cy.startAppServer('component')
 
     cy.withCtx(async (ctx, { specWithWhitespace }) => {
@@ -46,16 +70,18 @@ describe('Config options', () => {
     }, { specWithWhitespace })
 
     cy.visitApp()
+    cy.specsPageIsVisible()
     cy.contains(specWithWhitespace).click()
     cy.get('.passed > .num').should('contain', 2)
   })
 
   it('supports @cypress/vite-dev-server', () => {
     cy.scaffoldProject('vite2.9.1-react')
-    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-dev-server-function.config.ts'])
+    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-dev-server-function.config.ts', '--component'])
     cy.startAppServer('component')
 
     cy.visitApp()
+    cy.specsPageIsVisible()
     cy.contains('App.cy.jsx').click()
     cy.waitForSpecToFinish()
     cy.get('.passed > .num').should('contain', 2)
@@ -63,10 +89,11 @@ describe('Config options', () => {
 
   it('supports viteConfig as an async function', () => {
     cy.scaffoldProject('vite2.9.1-react')
-    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-async-function-config.config.ts'])
+    cy.openProject('vite2.9.1-react', ['--config-file', 'cypress-vite-async-function-config.config.ts', '--component'])
     cy.startAppServer('component')
 
     cy.visitApp()
+    cy.specsPageIsVisible()
     cy.contains('App.cy.jsx').click()
     cy.waitForSpecToFinish()
     cy.get('.passed > .num').should('contain', 2)
@@ -93,7 +120,7 @@ describe('sourcemaps', () => {
     `
 
     cy.scaffoldProject('vite3.0.2-react')
-    cy.openProject('vite3.0.2-react', ['--config-file', 'cypress-vite.config.ts'])
+    cy.openProject('vite3.0.2-react', ['--config-file', 'cypress-vite.config.ts', '--component'])
     cy.startAppServer('component')
 
     cy.withCtx(async (ctx, o) => {
@@ -125,6 +152,7 @@ describe('sourcemaps', () => {
 
     const verifySourcemap = (specName: string, line: number, column: number) => {
       cy.visitApp()
+      cy.specsPageIsVisible()
       cy.contains(specName).click()
       cy.waitForSpecToFinish()
       cy.get('.failed > .num').should('contain', 2)

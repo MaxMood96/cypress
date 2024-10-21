@@ -117,9 +117,11 @@ export function assembleScript (
     baseSourcemapExternalPath: string | undefined
     processedSourcemapExternalPath: string | undefined
     nodeEnv: string
+    cypressInternalEnv: string
     resolverMap?: Record<string, string>
     meta?: Metadata
     supportTypeScript: boolean
+    integrityCheckSource: string | undefined
   },
 ): { script: Buffer, processedSourceMap?: string } {
   const includeStrictVerifiers = opts.includeStrictVerifiers ?? false
@@ -152,7 +154,7 @@ export function assembleScript (
   const auxiliaryDataString = JSON.stringify(auxiliaryData)
 
   // 2. Determine the path of the main module which needs to be required in
-  //    order to trigger initialization o the modules we want to embedd during
+  //    order to trigger initialization of the modules we want to embed during
   //    snapshot creation
   const mainModuleRequirePath =
     opts.entryPoint ?? getMainModuleRequirePath(basedir, entryFilePath)
@@ -176,9 +178,11 @@ export function assembleScript (
     includeStrictVerifiers,
     sourceMap: opts.sourceMap,
     nodeEnv: opts.nodeEnv,
+    cypressInternalEnv: opts.cypressInternalEnv,
     basedir,
     processedSourceMapPath: opts.processedSourcemapExternalPath,
     supportTypeScript: opts.supportTypeScript,
+    integrityCheckSource: opts.integrityCheckSource,
   }
 
   // 5. Finally return the rendered script buffer and optionally processed
@@ -231,9 +235,11 @@ export async function createSnapshotScript (
       baseSourcemapExternalPath: opts.baseSourcemapExternalPath,
       processedSourcemapExternalPath: opts.processedSourcemapExternalPath,
       nodeEnv: opts.nodeEnv,
+      cypressInternalEnv: opts.cypressInternalEnv,
       resolverMap: opts.resolverMap,
       meta,
       supportTypeScript: opts.supportTypeScript,
+      integrityCheckSource: opts.integrityCheckSource,
     },
   )
 

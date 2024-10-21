@@ -5,8 +5,13 @@
     @update:modelValue="handleUpdate"
   >
     <template #default="{ open }">
-      <ListboxLabel class="font-medium text-sm text-gray-800 block">
-        <template v-if="label">
+      <ListboxLabel
+        :id="label ? labelId : ''"
+        class="font-medium text-sm text-gray-800 block"
+      >
+        <template
+          v-if="label"
+        >
           {{ label }}
         </template>
         <slot
@@ -31,10 +36,10 @@
             />
           </span>
           <span
-            class="pr-24px text-16px leading-24px"
+            class="pr-[24px] text-[16px] leading-[24px]"
             :class="
               {
-                'pl-24px': $slots['input-prefix'],
+                'pl-[24px]': $slots['input-prefix'],
               }
             "
           >
@@ -60,7 +65,7 @@
                   'rotate-180 icon-dark-indigo-600': open,
                   'rotate-0 icon-dark-gray-500': !open
                 }"
-                class="max-w-16px transform transition duration-250 group-hocus:icon-dark-indigo-600"
+                class="max-w-[16px] transform transition duration-250 group-hocus:icon-dark-indigo-600"
               />
             </slot>
           </span>
@@ -71,17 +76,20 @@
           leave-from-class="opacity-100"
           leave-to-class="opacity-0"
         >
-          <ListboxOptions class="bg-white rounded shadow-lg ring-black mt-1 text-base w-full max-h-60 ring-1 ring-opacity-5 z-10 absolute overflow-auto sm:text-sm focus:outline-none">
+          <ListboxOptions
+            :aria-labelledby="labelId"
+            class="bg-white rounded shadow-lg ring-black mt-1 text-base w-full max-h-60 ring-1 ring-opacity-5 z-10 absolute overflow-auto sm:text-sm focus:outline-none"
+          >
             <ListboxOption
               v-for="option in props.options"
               :key="get(option, itemKey)"
               v-slot="{ active, selected }"
-              as="ul"
+              as="li"
               :value="option"
               :disabled="option.disabled || false"
             >
-              <li
-                class="border-transparent cursor-pointer border-1 py-2 pr-8 pl-4 block truncate select-none relative "
+              <div
+                class="border-transparent cursor-pointer border py-2 pr-8 pl-4 block truncate select-none relative "
                 :class="[{
                   'font-medium bg-jade-50': isSelectedOption(option),
                   'bg-gray-50': active,
@@ -114,7 +122,6 @@
                     {{ get(option, itemValue || '') }}
                   </slot>
                 </span>
-
                 <span class="flex text-sm pr-3 inset-y-0 right-0 absolute items-center">
                   <slot
                     name="item-suffix"
@@ -127,15 +134,21 @@
                       class="flex pr-3 right-0 text-jade-400 absolute items-center"
                     >
                       <i-mdi-check
-                        class="h-16px w-16px"
+                        class="h-[16px] w-[16px]"
                         data-testid="icon-check"
                         aria-hidden="true"
                       />
                     </span>
                   </slot>
                 </span>
-              </li>
+              </div>
             </ListboxOption>
+            <li
+              v-if="$slots.footer"
+              role="option"
+            >
+              <slot name="footer" />
+            </li>
           </ListboxOptions>
         </transition>
       </div>
@@ -166,6 +179,7 @@ const props = withDefaults(defineProps<{
   modelValue?: Option // Current object being selected
   placeholder?: string
   label?: string
+  labelId: string
   /**
    * The value of the modelValue to render. `value` by default
    */
@@ -178,6 +192,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   placeholder: '',
   label: '',
+  labelId: undefined,
   itemValue: 'value',
   modelValue: undefined,
   itemKey: 'key',

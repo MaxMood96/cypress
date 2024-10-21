@@ -1,3 +1,70 @@
+# [@cypress/webpack-preprocessor-v6.0.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v6.0.1...@cypress/webpack-preprocessor-v6.0.2) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+# [@cypress/webpack-preprocessor-v6.0.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v6.0.0...@cypress/webpack-preprocessor-v6.0.1) (2023-12-26)
+
+# [@cypress/webpack-preprocessor-v6.0.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.17.1...@cypress/webpack-preprocessor-v6.0.0) (2023-08-29)
+
+
+* `@cypress/webpack-preprocessor-v6.0.0` was inadvertently released and published. There are no breaking changes or any other changes in this release.
+
+# [@cypress/webpack-preprocessor-v5.17.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.17.0...@cypress/webpack-preprocessor-v5.17.1) (2023-05-01)
+
+# [@cypress/webpack-preprocessor-v5.17.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.16.3...@cypress/webpack-preprocessor-v5.17.0) (2023-02-15)
+
+
+### Features
+
+* Bundle cy.origin() dependencies at runtime ([#25626](https://github.com/cypress-io/cypress/issues/25626)) ([41512c4](https://github.com/cypress-io/cypress/commit/41512c416a80e5158752fef9ffbe722402a5ada4))
+
+# [@cypress/webpack-preprocessor-v5.16.3](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.16.2...@cypress/webpack-preprocessor-v5.16.3) (2023-02-06)
+
+# [@cypress/webpack-preprocessor-v5.16.2](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.16.1...@cypress/webpack-preprocessor-v5.16.2) (2023-02-02)
+
+
+### Bug Fixes
+
+* allow version 9 of the babel-loader peer dependency ([#25569](https://github.com/cypress-io/cypress/issues/25569)) ([5afe19f](https://github.com/cypress-io/cypress/commit/5afe19f8d17b5da53d66a0513424403006167adf))
+
+# [@cypress/webpack-preprocessor-v5.16.1](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.16.0...@cypress/webpack-preprocessor-v5.16.1) (2022-12-29)
+
+
+### Bug Fixes
+
+* added missing pending data which caused incorrect mochaawesome reports ([#25264](https://github.com/cypress-io/cypress/issues/25264)) ([6fc13e6](https://github.com/cypress-io/cypress/commit/6fc13e6f20f203fd58aa18c0a736414aea5e0556))
+
+# [@cypress/webpack-preprocessor-v5.16.0](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.15.7...@cypress/webpack-preprocessor-v5.16.0) (2022-12-19)
+
+
+### Features
+
+* create from React component ([#25168](https://github.com/cypress-io/cypress/issues/25168)) ([166b694](https://github.com/cypress-io/cypress/commit/166b69414c5e347ef825c121330b0b561a4caa3b)), closes [#24881](https://github.com/cypress-io/cypress/issues/24881) [#24954](https://github.com/cypress-io/cypress/issues/24954) [#24982](https://github.com/cypress-io/cypress/issues/24982) [#25079](https://github.com/cypress-io/cypress/issues/25079) [#25145](https://github.com/cypress-io/cypress/issues/25145)
+
+# [@cypress/webpack-preprocessor-v5.15.7](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.15.6...@cypress/webpack-preprocessor-v5.15.7) (2022-12-09)
+
+
+### Bug Fixes
+
+* declare used babel dependencies ([#24842](https://github.com/cypress-io/cypress/issues/24842)) ([910f912](https://github.com/cypress-io/cypress/commit/910f912373bf857a196e2a0d1a73606e3ee199be))
+
+# [@cypress/webpack-preprocessor-v5.15.6](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.15.5...@cypress/webpack-preprocessor-v5.15.6) (2022-12-02)
+
+
+### Bug Fixes
+
+* **breaking:** exclude node_modules from cross-origin-callback-loader ([#24952](https://github.com/cypress-io/cypress/issues/24952)) ([27c425d](https://github.com/cypress-io/cypress/commit/27c425dda318c316f751a000b77b39fe727999d5))
+
+# [@cypress/webpack-preprocessor-v5.15.5](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.15.4...@cypress/webpack-preprocessor-v5.15.5) (2022-11-10)
+
+
+### Bug Fixes
+
+* custom reporter and experimentalSessionAndOrigin crashes ([#24630](https://github.com/cypress-io/cypress/issues/24630)) ([e9e8cad](https://github.com/cypress-io/cypress/commit/e9e8cadda4fb14d601079018b57425b221a005d9))
+
 # [@cypress/webpack-preprocessor-v5.15.4](https://github.com/cypress-io/cypress/compare/@cypress/webpack-preprocessor-v5.15.3...@cypress/webpack-preprocessor-v5.15.4) (2022-11-07)
 
 

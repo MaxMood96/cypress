@@ -4,25 +4,24 @@ import path from 'path'
 import _ from 'lodash'
 import del from 'del'
 import chalk from 'chalk'
-import electron from '@packages/electron'
+import electron from '../../packages/electron'
 import la from 'lazy-ass'
 import { promisify } from 'util'
 import glob from 'glob'
-
 import * as packages from './util/packages'
 import * as meta from './meta'
-import xvfb from '../../cli/lib/exec/xvfb'
-import smoke from './smoke'
 import { spawn, execSync } from 'child_process'
 import { transformRequires } from './util/transform-requires'
 import execa from 'execa'
 import { testStaticAssets } from './util/testStaticAssets'
 import performanceTracking from '../../system-tests/lib/performance'
-import verify from '../../cli/lib/tasks/verify'
+import * as electronBuilder from 'electron-builder'
 
 const globAsync = promisify(glob)
 
 const CY_ROOT_DIR = path.join(__dirname, '..', '..')
+
+const jsonRoot = fs.readJSONSync(path.join(CY_ROOT_DIR, 'package.json'))
 
 const log = function (msg) {
   const time = new Date()
@@ -73,7 +72,7 @@ async function checkMaxPathLength () {
 // For debugging the flow without rebuilding each time
 
 export async function buildCypressApp (options: BuildCypressAppOpts) {
-  const { platform, version, skipSigning = false, keepBuild = false } = options
+  const { platform, version, keepBuild = false } = options
 
   log('#checkPlatform')
   if (platform !== os.platform()) {
@@ -97,7 +96,12 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
   if (!keepBuild) {
     log('#buildPackages')
 
-    await execa('yarn', ['lerna', 'run', 'build-prod', '--ignore', 'cli', '--concurrency', '1'], {
+    await execa('yarn', ['lerna', 'run', 'build', '--concurrency', '4'], {
+      stdio: 'inherit',
+      cwd: CY_ROOT_DIR,
+    })
+
+    await execa('yarn', ['lerna', 'run', 'build-prod', '--concurrency', '4'], {
       stdio: 'inherit',
       cwd: CY_ROOT_DIR,
     })
@@ -106,9 +110,19 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
   // Copy Packages: We want to copy the package.json, files, and output
   log('#copyAllToDist')
   await packages.copyAllToDist(DIST_DIR)
-  fs.copySync(path.join(CY_ROOT_DIR, 'patches'), path.join(DIST_DIR, 'patches'))
 
-  const jsonRoot = fs.readJSONSync(path.join(CY_ROOT_DIR, 'package.json'))
+  fs.copySync(path.join(CY_ROOT_DIR, 'patches'), path.join(DIST_DIR, 'patches'), {
+    // in some cases the dependency tree for nested dependencies changes when running
+    // a `yarn install` vs a `yarn install --production`. This is the case for `whatwg-url@7`,
+    // which i as a dependency of `source-map`, which is a devDependency in @packages/driver.
+    // This package gets hoisted by lerna to the root monorepo directory, but when install
+    // is run with --production, the directory structure changes and `whatwg-url@5` is
+    // installed and hoisted, which causes problems with patch-package.
+
+    // since we are only installing production level dependencies in this case, we do not need to copy
+    // dev patches into the DIST_DIR as they will not be applied anyway, allowing us to work around this problem.
+    filter: (src, _) => !src.includes('.dev.patch'),
+  })
 
   const packageJsonContents = _.omit(jsonRoot, [
     'devDependencies',
@@ -120,6 +134,7 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
   fs.writeJsonSync(meta.distDir('package.json'), {
     ...packageJsonContents,
     scripts: {
+      // After the `yarn --production` install, we need to patch packages
       postinstall: 'patch-package',
     },
   }, { spaces: 2 })
@@ -139,6 +154,12 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
     stdio: 'inherit',
   })
 
+  log('#copying better-sqlite3')
+  fs.copySync(
+    path.join(CY_ROOT_DIR, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'),
+    path.join(DIST_DIR, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'),
+  )
+
   // TODO: Validate no-hoists / single copies of libs
 
   // Remove extra directories that are large/unneeded
@@ -147,7 +168,6 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
     meta.distDir('**', 'image-q', 'demo'),
     meta.distDir('**', 'gifwrap', 'test'),
     meta.distDir('**', 'pixelmatch', 'test'),
-    meta.distDir('**', '@jimp', 'tiff', 'test'),
     meta.distDir('**', '@cypress', 'icons', '**/*.{ai,eps}'),
     meta.distDir('**', 'esprima', 'test'),
     meta.distDir('**', 'bmp-js', 'test'),
@@ -174,19 +194,17 @@ export async function buildCypressApp (options: BuildCypressAppOpts) {
   }, { spaces: 2 })
 
   fs.writeFileSync(meta.distDir('index.js'), `\
-${!['1', 'true'].includes(process.env.DISABLE_SNAPSHOT_REQUIRE) ?
-`if (!global.snapshotResult && process.versions?.electron) {
-  throw new Error('global.snapshotResult is not defined. This binary has been built incorrectly.')
-}` : ''}
 process.env.CYPRESS_INTERNAL_ENV = process.env.CYPRESS_INTERNAL_ENV || 'production'
-require('./packages/server')\
+require('./packages/server/index.js')
 `)
 
   // removeTypeScript
+  log('#remove typescript files and devDep patches')
   await del([
     // include ts files of packages
     meta.distDir('**', '*.ts'),
-
+    // remove dev dep patches
+    meta.distDir('**', '*.dev.patch'),
     // except those in node_modules
     `!${meta.distDir('**', 'node_modules', '**', '*.ts')}`,
   ], { force: true })
@@ -198,7 +216,6 @@ require('./packages/server')\
 
   // transformSymlinkRequires
   log('#transformSymlinkRequires')
-
   await transformRequires(meta.distDir())
 
   log(`#testDistVersion ${meta.distDir()}`)
@@ -206,6 +223,10 @@ require('./packages/server')\
 
   log('#testStaticAssets')
   await testStaticAssets(meta.distDir())
+}
+
+export async function packageElectronApp (options: BuildCypressAppOpts) {
+  const { platform, version, skipSigning = false } = options
 
   log('#removeCyAndBinFolders')
   await del([
@@ -230,29 +251,14 @@ require('./packages/server')\
   // to learn how to get the right Mac certificate for signing and notarizing
   // the built Test Runner application
 
+  const electronVersion = electron.getElectronVersion()
+
   const appFolder = meta.distDir()
   const outputFolder = meta.buildRootDir()
 
   const iconFilename = getIconFilename()
 
   console.log(`output folder: ${outputFolder}`)
-
-  const args = [
-    '--publish=never',
-    `--c.electronVersion=${electronVersion}`,
-    `--c.directories.app=${appFolder}`,
-    `--c.directories.output=${outputFolder}`,
-    `--c.icon=${iconFilename}`,
-    // for now we cannot pack source files in asar file
-    // because electron-builder does not copy nested folders
-    // from packages/*/node_modules
-    // see https://github.com/electron-userland/electron-builder/issues/3185
-    // so we will copy those folders later ourselves
-    '--c.asar=false',
-  ]
-
-  console.log('electron-builder arguments:')
-  console.log(args.join(' '))
 
   // Update the root package.json with the next app version so that it is snapshot properly
   fs.writeJSONSync(path.join(CY_ROOT_DIR, 'package.json'), {
@@ -261,10 +267,21 @@ require('./packages/server')\
   }, { spaces: 2 })
 
   try {
-    await execa('electron-builder', args, {
-      stdio: 'inherit',
-      env: {
-        NODE_OPTIONS: '--max_old_space_size=8192',
+    await electronBuilder.build({
+      publish: 'never',
+      config: {
+        electronVersion,
+        directories: {
+          app: appFolder,
+          output: outputFolder,
+        },
+        icon: iconFilename,
+        // for now we cannot pack source files in asar file
+        // because electron-builder does not copy nested folders
+        // from packages/*/node_modules
+        // see https://github.com/electron-userland/electron-builder/issues/3185
+        // so we will copy those folders later ourselves
+        asar: false,
       },
     })
   } catch (e) {
@@ -284,26 +301,6 @@ require('./packages/server')\
   const { stdout } = await execa('ls', ['-la', meta.buildDir()])
 
   console.log(stdout)
-
-  // runSmokeTests
-  let usingXvfb = xvfb.isNeeded()
-
-  try {
-    if (usingXvfb) {
-      await xvfb.start()
-    }
-
-    log(`#testExecutableVersion ${meta.buildAppExecutable()}`)
-    await testExecutableVersion(meta.buildAppExecutable(), version)
-
-    const executablePath = meta.buildAppExecutable()
-
-    await smoke.test(executablePath)
-  } finally {
-    if (usingXvfb) {
-      await xvfb.stop()
-    }
-  }
 
   // verifyAppCanOpen
   if (platform === 'darwin' && !skipSigning) {
@@ -394,27 +391,4 @@ async function testDistVersion (distDir: string, version: string) {
     result.stdout, 'from input version to build', version)
 
   console.log('✅ using node --version works')
-}
-
-async function testExecutableVersion (buildAppExecutable: string, version: string) {
-  log('#testVersion')
-
-  console.log('testing built app executable version')
-  console.log(`by calling: ${buildAppExecutable} --version`)
-
-  const args = ['--version']
-
-  if (verify.needsSandbox()) {
-    args.push('--no-sandbox')
-  }
-
-  const result = await execa(buildAppExecutable, args)
-
-  la(result.stdout, 'missing output when getting built version', result)
-
-  console.log('built app version', result.stdout)
-  la(result.stdout.trim() === version.trim(), 'different version reported',
-    result.stdout, 'from input version to build', version)
-
-  console.log('✅ using --version on the Cypress binary works')
 }

@@ -51,6 +51,30 @@ describe('src/cy/commands/actions/select', () => {
       })
     })
 
+    it('can select by value when value contains a quotation mark', () => {
+      cy.$$('select[name=maps] option:nth-child(3)').attr('value', '"test"')
+
+      cy.get('select[name=maps]').select('"test"').then(($select) => {
+        expect($select[0].selectedOptions[0].text).to.eq('nuke')
+      })
+    })
+
+    it('can select by index when value contains a quotation mark', () => {
+      cy.$$('select[name=maps] option:nth-child(3)').attr('value', '"test"')
+
+      cy.get('select[name=maps]').select(2).then(($select) => {
+        expect($select[0].selectedOptions[0].text).to.eq('nuke')
+      })
+    })
+
+    it('can handle index when all values are identical', () => {
+      cy.$$('select[name=maps] option').attr('value', 'foo')
+
+      cy.get('select[name=maps]').select(2).then(($select) => {
+        expect($select[0].selectedOptions[0].text).to.eq('nuke')
+      })
+    })
+
     it('can select an array of values', () => {
       cy.get('select[name=movies]').select(['apoc', 'br', 'co']).then(($select) => {
         expect($select.val()).to.deep.eq(['apoc', 'br', 'co'])
@@ -76,12 +100,6 @@ describe('src/cy/commands/actions/select', () => {
         expect($select.val()).to.equal('same')
         expect($select.find('option:selected')).to.have.text('Uhura')
         expect($select[0].selectedIndex).to.equal(2)
-      })
-    })
-
-    it('can select an array of values', () => {
-      cy.get('select[name=movies]').select(['apoc', 'br']).then(($select) => {
-        expect($select.val()).to.deep.eq(['apoc', 'br'])
       })
     })
 
@@ -214,11 +232,13 @@ describe('src/cy/commands/actions/select', () => {
       const select = cy.$$('select[name=disabled]')
 
       cy.on('command:retry', _.once(() => {
-        select.prop('disabled', false)
+        // Replace the element with a copy of itself, to ensure .select() is requerying the DOM
+        select.replaceWith(select[0].outerHTML)
+        cy.$$('select[name=disabled]').prop('disabled', false)
       }))
 
       cy.get('select[name=disabled]').select('foo')
-      .invoke('val').should('eq', 'foo')
+      cy.get('select[name=disabled]').invoke('val').should('eq', 'foo')
     })
 
     it('retries until <optgroup> is no longer disabled', () => {
@@ -376,7 +396,7 @@ describe('src/cy/commands/actions/select', () => {
 
         cy.on('fail', (err) => {
           expect(selected).to.eq(1)
-          expect(err.message).to.include('`cy.select()` failed because this element')
+          expect(err.message).to.include('`cy.select()` failed because the page updated')
 
           done()
         })
@@ -543,8 +563,7 @@ describe('src/cy/commands/actions/select', () => {
 
       it('throws when the <select> itself is disabled', (done) => {
         cy.on('fail', (err) => {
-          expect(err.message).to.include('`cy.select()` failed because this element is currently disabled:')
-          expect(err.docsUrl).to.eq('https://on.cypress.io/select')
+          expect(err.message).to.include('`cy.select()` failed because this element is `disabled`:')
 
           done()
         })
@@ -554,8 +573,7 @@ describe('src/cy/commands/actions/select', () => {
 
       it('throws when the <select> is disabled by a disabled <fieldset>', (done) => {
         cy.on('fail', (err) => {
-          expect(err.message).to.include('`cy.select()` failed because this element is currently disabled:')
-          expect(err.docsUrl).to.eq('https://on.cypress.io/select')
+          expect(err.message).to.include('`cy.select()` failed because this element is `disabled`:')
 
           done()
         })
@@ -636,6 +654,39 @@ describe('src/cy/commands/actions/select', () => {
         return null
       })
 
+      it('can turn off logging when protocol is disabled', { protocolEnabled: false }, function () {
+        cy.on('_log:added', (attrs, log) => {
+          this.hiddenLog = log
+        })
+
+        cy.get('#select-maps').select('de_dust2', { log: false })
+
+        cy.then(function () {
+          const { lastLog, hiddenLog } = this
+
+          expect(lastLog.get('name'), 'log name').to.not.eq('select')
+          expect(hiddenLog).to.be.undefined
+        })
+      })
+
+      it('can send hidden log when protocol is enabled', { protocolEnabled: true }, function () {
+        cy.on('_log:added', (attrs, log) => {
+          this.hiddenLog = log
+        })
+
+        cy.get('#select-maps').select('de_dust2', { log: false })
+
+        cy.then(function () {
+          const { lastLog, hiddenLog } = this
+
+          expect(lastLog.get('name'), 'log name').to.not.eq('select')
+
+          expect(hiddenLog.get('name'), 'log name').to.eq('select')
+          expect(hiddenLog.get('hidden'), 'log hidden').to.be.true
+          expect(hiddenLog.get('snapshots').length, 'log snapshot length').to.eq(2)
+        })
+      })
+
       it('logs out select', () => {
         cy.get('#select-maps').select('de_dust2').then(function () {
           const { lastLog } = this
@@ -648,7 +699,7 @@ describe('src/cy/commands/actions/select', () => {
         cy.get('#select-maps').select('de_dust2').then(function ($select) {
           const { lastLog } = this
 
-          expect(lastLog.get('$el')).to.eq($select)
+          expect(lastLog.get('$el')).to.eql($select)
         })
       })
 
@@ -699,13 +750,30 @@ describe('src/cy/commands/actions/select', () => {
       it('#consoleProps', () => {
         cy.get('#select-maps').select('de_dust2').then(function ($select) {
           const { fromElWindow } = Cypress.dom.getElementCoordinatesByPosition($select)
-          const console = this.lastLog.invoke('consoleProps')
+          const consoleProps = this.lastLog.invoke('consoleProps')
 
-          expect(console.Command).to.eq('select')
-          expect(console.Selected).to.deep.eq(['de_dust2'])
-          expect(console['Applied To']).to.eq($select.get(0))
-          expect(console.Coords.x).to.be.closeTo(fromElWindow.x, 10)
-          expect(console.Coords.y).to.be.closeTo(fromElWindow.y, 10)
+          expect(consoleProps.name).to.eq('select')
+          expect(consoleProps.type).to.eq('command')
+          expect(consoleProps.props.Selected).to.deep.eq(['de_dust2'])
+          expect(consoleProps.props['Applied To']).to.eq($select.get(0))
+          expect(consoleProps.props.Coords.x).to.be.closeTo(fromElWindow.x, 10)
+          expect(consoleProps.props.Coords.y).to.be.closeTo(fromElWindow.y, 10)
+
+          expect(consoleProps).to.have.property('table')
+          expect(consoleProps.table[1]()).to.containSubset({
+            'name': 'Mouse Events',
+            'data': [
+              { 'Event Type': 'pointerover' },
+              { 'Event Type': 'mouseover' },
+              { 'Event Type': 'pointermove' },
+              { 'Event Type': 'pointerdown' },
+              { 'Event Type': 'mousedown' },
+              { 'Event Type': 'pointerover' },
+              { 'Event Type': 'pointerup' },
+              { 'Event Type': 'mouseup' },
+              { 'Event Type': 'click' },
+            ],
+          })
         })
       })
 
@@ -729,7 +797,7 @@ describe('src/cy/commands/actions/select', () => {
           const { lastLog } = this
 
           expect(lastLog.get('message')).to.eq('{force: true, timeout: 1000}')
-          expect(lastLog.invoke('consoleProps').Options).to.deep.eq({ force: true, timeout: 1000 })
+          expect(lastLog.invoke('consoleProps').props.Options).to.deep.eq({ force: true, timeout: 1000 })
         })
       })
     })

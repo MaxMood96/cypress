@@ -3,17 +3,23 @@ import _ from 'lodash'
 import logSymbols from 'log-symbols'
 import chalk from 'chalk'
 import human from 'human-interval'
+import prettyBytes from 'pretty-bytes'
 import pkg from '@packages/root'
 import humanTime from './human_time'
 import duration from './duration'
 import newlines from './newlines'
 import env from './env'
 import terminal from './terminal'
+import { getIsCi } from './ci_provider'
 import * as experiments from '../experiments'
-import type { SpecFile } from '@packages/types'
+import type { SpecFile, ProtocolError } from '@packages/types'
 import type { Cfg } from '../project-base'
 import type { Browser } from '../browsers/types'
 import type { Table } from 'cli-table3'
+import type { CypressRunResult } from '../modes/results'
+import type { IArtifact, ArtifactUploadResult } from '../cloud/artifacts/artifact'
+
+import { ArtifactKinds } from '../cloud/artifacts/artifact'
 
 type Screenshot = {
   width: number
@@ -22,11 +28,18 @@ type Screenshot = {
   specName: string
 }
 
+export const cloudRecommendationMessage = `
+  Having trouble debugging your CI failures?
+
+  Record your runs to Cypress Cloud to watch video recordings for each test,
+  debug failing and flaky tests, and integrate with your favorite tools.
+`
+
 function color (val: any, c: string) {
   return chalk[c](val)
 }
 
-function gray (val: any) {
+export function gray (val: any) {
   return color(val, 'gray')
 }
 
@@ -160,16 +173,16 @@ function formatNodeVersion ({ resolvedNodeVersion, resolvedNodePath }: Pick<Cfg,
   return
 }
 
-function formatRecordParams (runUrl?: string, parallel?: boolean, group?: string, tag?: string) {
+function formatRecordParams (runUrl?: string, parallel?: boolean, group?: string, tag?: string, autoCancelAfterFailures?: number | false) {
   if (runUrl) {
-    return `Tag: ${tag || 'false'}, Group: ${group || 'false'}, Parallel: ${Boolean(parallel)}`
+    return `Tag: ${tag || 'false'}, Group: ${group || 'false'}, Parallel: ${Boolean(parallel)}${autoCancelAfterFailures !== undefined ? `, Auto Cancel After Failures: ${autoCancelAfterFailures}` : ''}`
   }
 
   return
 }
 
-export function displayRunStarting (options: { browser: Browser, config: Cfg, group: string | undefined, parallel?: boolean, runUrl?: string, specPattern: string | RegExp | string[], specs: SpecFile[], tag: string | undefined }) {
-  const { browser, config, group, parallel, runUrl, specPattern, specs, tag } = options
+export function displayRunStarting (options: { browser: Browser, config: Cfg, group: string | undefined, parallel?: boolean, runUrl?: string, specPattern: string | RegExp | string[], specs: SpecFile[], tag: string | undefined, autoCancelAfterFailures?: number | false }) {
+  const { browser, config, group, parallel, runUrl, specPattern, specs, tag, autoCancelAfterFailures } = options
 
   console.log('')
 
@@ -224,7 +237,7 @@ export function displayRunStarting (options: { browser: Browser, config: Cfg, gr
     [gray('Node Version:'), formatNodeVersion(config, getWidth(table, 1))],
     [gray('Specs:'), formatSpecs(specs)],
     [gray('Searched:'), formatPath(Array.isArray(specPattern) ? specPattern.join(', ') : String(specPattern), getWidth(table, 1))],
-    [gray('Params:'), formatRecordParams(runUrl, parallel, group, tag)],
+    [gray('Params:'), formatRecordParams(runUrl, parallel, group, tag, autoCancelAfterFailures)],
     [gray('Run URL:'), runUrl ? formatPath(runUrl, getWidth(table, 1)) : ''],
     [gray('Experiments:'), hasExperiments ? experiments.formatExperiments(enabledExperiments) : ''],
   ])
@@ -274,7 +287,21 @@ export function displaySpecHeader (name: string, curr: number, total: number, es
   }
 }
 
-export function renderSummaryTable (runUrl: string | undefined, results: any) {
+export function maybeLogCloudRecommendationMessage (runs: CypressCommandLine.RunResult[], record: boolean) {
+  if (!getIsCi() || env.get('CYPRESS_COMMERCIAL_RECOMMENDATIONS') === '0' || record) {
+    return
+  }
+
+  if (runs.some((run) => run.stats.failures > 0)) {
+    terminal.divider('-')
+    console.log(cloudRecommendationMessage)
+    console.log(`  >>`, color('https://on.cypress.io/cloud-get-started', 'cyan'))
+    console.log('')
+    terminal.divider('-')
+  }
+}
+
+export function renderSummaryTable (runUrl: string | undefined, results: CypressRunResult) {
   const { runs } = results
 
   console.log('')
@@ -452,13 +479,7 @@ function displayScreenshots (screenshots: Screenshot[] = []) {
   console.log('')
 }
 
-export function displayVideoProcessingProgress (opts: { videoName: string, videoCompression: number | false }) {
-  console.log('')
-
-  terminal.header('Video', {
-    color: ['cyan'],
-  })
-
+export function displayVideoCompressionProgress (opts: { videoName: string, videoCompression: number | boolean }) {
   console.log('')
 
   const table = terminal.table({
@@ -476,7 +497,7 @@ export function displayVideoProcessingProgress (opts: { videoName: string, video
 
   table.push([
     gray('-'),
-    gray('Started processing:'),
+    gray('Started compressing:'),
     chalk.cyan(`Compressing to ${opts.videoCompression} CRF`),
   ])
 
@@ -490,10 +511,10 @@ export function displayVideoProcessingProgress (opts: { videoName: string, video
     onProgress (float: number) {
       if (float === 1) {
         const finished = Date.now() - started
-        const dur = `(${humanTime.long(finished)})`
+        const dur = `${humanTime.long(finished)}`
 
         const table = terminal.table({
-          colWidths: [3, 21, 61, 15],
+          colWidths: [3, 22, 60, 15],
           colAligns: ['left', 'left', 'left', 'right'],
           type: 'noBorder',
           style: {
@@ -507,14 +528,11 @@ export function displayVideoProcessingProgress (opts: { videoName: string, video
 
         table.push([
           gray('-'),
-          gray('Finished processing:'),
-            `${formatPath(opts.videoName, getWidth(table, 2), 'cyan')}`,
-            gray(dur),
+          gray('Finished compressing:'),
+          gray(dur),
         ])
 
         console.log(table.toString())
-
-        console.log('')
       }
 
       if (Date.now() - progress > throttle) {
@@ -526,5 +544,178 @@ export function displayVideoProcessingProgress (opts: { videoName: string, video
         console.log('    Compression progress: ', chalk.cyan(percentage))
       }
     },
+  }
+}
+
+export const printVideoHeader = () => {
+  console.log('')
+
+  terminal.header('Video', {
+    color: ['cyan'],
+  })
+}
+
+export const printVideoPath = (videoName?: string) => {
+  if (videoName !== undefined) {
+    console.log('')
+
+    console.log(`  -  Video output: ${formatPath(videoName, undefined, 'cyan')}`)
+
+    console.log('')
+  }
+}
+
+const formatFileSize = (bytes: number) => {
+  // in test environments, mask the value as it may differ from environment
+  // to environment
+  if (env.get('CYPRESS_INTERNAL_ENV') === 'test') {
+    return prettyBytes(1000)
+  }
+
+  return prettyBytes(bytes)
+}
+
+export const printPendingArtifactUpload = (artifact: IArtifact, labels: Record<'protocol' | 'screenshots' | 'video', string>): void => {
+  process.stdout.write(`  - ${labels[artifact.reportKey]} `)
+
+  if (artifact.fileSize) {
+    process.stdout.write(`- ${formatFileSize(Number(artifact.fileSize))}`)
+  }
+
+  if (artifact.filePath && artifact.reportKey !== 'protocol') {
+    process.stdout.write(` ${formatPath(artifact.filePath, undefined, 'cyan')}`)
+  }
+
+  process.stdout.write('\n')
+}
+
+export const printSkippedArtifact = (label: string, message: string = 'Nothing to upload', error?: string) => {
+  process.stdout.write(`  - ${label} - ${message} `)
+  if (error) {
+    process.stdout.write(`- ${error}`)
+  }
+
+  process.stdout.write('\n')
+}
+
+export const logUploadManifest = (artifacts: IArtifact[], protocolCaptureMeta: {
+  url?: string
+  disabledMessage?: string
+}, protocolFatalError?: ProtocolError) => {
+  const labels = {
+    [ArtifactKinds.VIDEO]: 'Video',
+    [ArtifactKinds.SCREENSHOTS]: 'Screenshot',
+    [ArtifactKinds.PROTOCOL]: 'Test Replay',
+  }
+
+  // eslint-disable-next-line no-console
+  console.log('')
+  terminal.header('Uploading Cloud Artifacts', {
+    color: ['blue'],
+  })
+
+  // eslint-disable-next-line no-console
+  console.log('')
+
+  const video = artifacts.find(({ reportKey }) => reportKey === ArtifactKinds.VIDEO)
+  const screenshots = artifacts.filter(({ reportKey }) => reportKey === ArtifactKinds.SCREENSHOTS)
+  const protocol = artifacts.find(({ reportKey }) => reportKey === ArtifactKinds.PROTOCOL)
+
+  if (video) {
+    printPendingArtifactUpload(video, labels)
+  } else {
+    printSkippedArtifact('Video')
+  }
+
+  if (screenshots.length) {
+    screenshots.forEach(((screenshot) => {
+      printPendingArtifactUpload(screenshot, labels)
+    }))
+  } else {
+    printSkippedArtifact('Screenshot')
+  }
+
+  // if protocolFatalError exists here, there is not a protocol artifact to attempt to upload
+  if (protocolFatalError) {
+    printSkippedArtifact('Test Replay', 'Failed Capturing', protocolFatalError.error.message)
+  } else if (protocol) {
+    if (!protocolFatalError) {
+      printPendingArtifactUpload(protocol, labels)
+    }
+  } else if (protocolCaptureMeta.disabledMessage) {
+    printSkippedArtifact('Test Replay', 'Nothing to upload', protocolCaptureMeta.disabledMessage)
+  }
+}
+
+export const printCompletedArtifactUpload = ({ pathToFile, key, fileSize, success, error, uploadDuration }: ArtifactUploadResult, labels: Record<'protocol' | 'screenshots' | 'video', string>, num: string): void => {
+  process.stdout.write(`  - ${labels[key]} `)
+
+  if (success) {
+    process.stdout.write(`- Done Uploading ${formatFileSize(Number(fileSize))}`)
+  } else {
+    process.stdout.write(`- Failed Uploading`)
+  }
+
+  if (uploadDuration) {
+    const durationOut = humanTime.short(uploadDuration, 2)
+
+    process.stdout.write(` ${success ? 'in' : 'after'} ${durationOut}`)
+  }
+
+  process.stdout.write(` ${num}`)
+
+  if (pathToFile && key !== 'protocol') {
+    process.stdout.write(` ${formatPath(pathToFile, undefined, 'cyan')}`)
+  }
+
+  if (error) {
+    process.stdout.write(` - ${error}`)
+  }
+
+  process.stdout.write('\n')
+}
+
+export const logUploadResults = (results: ArtifactUploadResult[], protocolFatalError: ProtocolError | undefined) => {
+  if (!results.length) {
+    return
+  }
+
+  const labels = {
+    [ArtifactKinds.VIDEO]: 'Video',
+    [ArtifactKinds.SCREENSHOTS]: 'Screenshot',
+    [ArtifactKinds.PROTOCOL]: 'Test Replay',
+  }
+
+  // eslint-disable-next-line no-console
+  console.log('')
+
+  terminal.header('Uploaded Cloud Artifacts', {
+    color: ['blue'],
+  })
+
+  // eslint-disable-next-line no-console
+  console.log('')
+
+  results.forEach(({ key, ...report }, i, { length }) => {
+    printCompletedArtifactUpload({ key, ...report }, labels, chalk.grey(`${i + 1}/${length}`))
+  })
+}
+
+const UPLOAD_ACTIVITY_INTERVAL = typeof env.get('CYPRESS_UPLOAD_ACTIVITY_INTERVAL') === 'undefined' ? 15000 : env.get('CYPRESS_UPLOAD_ACTIVITY_INTERVAL')
+
+export const beginUploadActivityOutput = () => {
+  console.log('')
+  process.stdout.write(chalk.bold.blue('  Uploading Cloud Artifacts: '))
+  process.stdout.write(chalk.bold.blue('. '))
+  const uploadActivityInterval = setInterval(() => {
+    process.stdout.write(chalk.bold.blue('. '))
+  }, UPLOAD_ACTIVITY_INTERVAL)
+
+  return () => {
+    if (uploadActivityInterval) {
+      console.log('')
+    }
+
+    clearInterval(uploadActivityInterval)
   }
 }

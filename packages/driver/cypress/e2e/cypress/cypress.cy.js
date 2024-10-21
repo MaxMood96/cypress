@@ -104,7 +104,7 @@ describe('driver/src/cypress/index', () => {
     })
   })
 
-  context('.Log', () => {
+  context('.log', () => {
     it('throws when passing non-object to Cypress.log()', () => {
       const fn = () => {
         Cypress.log('My Log')

@@ -31,18 +31,6 @@ const logError = debug('cypress:snapgen:error')
  *
  * @property nodeModulesOnly if `true` only node modules will be included in the snapshot and app modules are omitted
  *
- * @property previousHealthy relative paths to modules that were previously
- * determined to be _healthy_ that is they can be included into the snapshot
- * without being deferred
- *
- * @property previousDeferred relative paths to modules that were previously
- * determined as problematic, that is it cannot be initialized during snapshot
- * creation and thus need to be _deferred_ during snapshot creation
- *
- * @property previousNoRewrite relative paths to modules that were previously
- * determined to result in invalid code when the snapshot bundler rewrites
- * their code and thus should not be rewritten
- *
  * @property forceNoRewrite relative paths to modules that we know will cause
  * problems when rewritten and we manually want to exclude them from snapshot
  * bundler rewrites
@@ -80,6 +68,9 @@ const logError = debug('cypress:snapgen:error')
  * @property nodeEnv the string to provide to `process.env.NODE_ENV` during
  * snapshot creation
  *
+ * @property cypressInternalEnv the string to provide to `process.env.CYPRESS_INTERNAL_ENV` during
+ * snapshot creation
+ *
  * @property minify if `true` the snapshot script will be minified
  *
  * @property supportTypeScript if `true` then TypeScript should be supported
@@ -91,15 +82,16 @@ export type GenerationOpts = {
   cacheDir: string
   snapshotBinDir: string
   nodeModulesOnly: boolean
-  previousHealthy?: string[]
-  previousDeferred?: string[]
-  previousNoRewrite?: string[]
   forceNoRewrite?: string[]
   resolverMap?: Record<string, string>
   flags: Flag
   nodeEnv: string
+  cypressInternalEnv: string
   minify: boolean
   supportTypeScript: boolean
+  integrityCheckSource: string | undefined
+  useExistingSnapshotScript?: boolean
+  updateSnapshotScriptContents?: (contents: string) => string
 }
 
 function getDefaultGenerationOpts (projectBaseDir: string): GenerationOpts {
@@ -107,13 +99,14 @@ function getDefaultGenerationOpts (projectBaseDir: string): GenerationOpts {
     cacheDir: join(projectBaseDir, 'cache'),
     snapshotBinDir: projectBaseDir,
     nodeModulesOnly: true,
-    previousDeferred: [],
-    previousHealthy: [],
-    previousNoRewrite: [],
     flags: Flag.Script | Flag.MakeSnapshot | Flag.ReuseDoctorArtifacts,
     nodeEnv: 'development',
+    cypressInternalEnv: 'development',
     minify: false,
     supportTypeScript: false,
+    integrityCheckSource: undefined,
+    useExistingSnapshotScript: false,
+    updateSnapshotScriptContents: undefined,
   }
 }
 
@@ -144,18 +137,16 @@ export class SnapshotGenerator {
   private readonly electronVersion: string
   /** See {@link GenerationOpts} nodeModulesOnly */
   private readonly nodeModulesOnly: boolean
-  /** See {@link GenerationOpts} previousDeferred */
-  private readonly previousDeferred: Set<string>
-  /** See {@link GenerationOpts} previousHealthy */
-  private readonly previousHealthy: Set<string>
-  /** See {@link GenerationOpts} previousNoRewrite */
-  private readonly previousNoRewrite: Set<string>
   /** See {@link GenerationOpts} forceNoRewrite */
   private readonly forceNoRewrite: Set<string>
   /** See {@link GenerationOpts} nodeEnv */
   private readonly nodeEnv: string
+  /** See {@link GenerationOpts} cypressInternalEnv */
+  private readonly cypressInternalEnv: string
   /** See {@link GenerationOpts} minify */
   private readonly minify: boolean
+  /** See {@link GenerationOpts} integrityCheckSource */
+  private readonly integrityCheckSource: string | undefined
   /**
    * Path to the Go bundler binary used to generate the bundle with rewritten code
    * {@link https://github.com/cypress-io/esbuild/tree/thlorenz/snap}
@@ -173,6 +164,14 @@ export class SnapshotGenerator {
    * Path where v8context bin is stored, derived from {@link GenerationOpts} snapshotBinDir
    */
   private v8ContextFile?: string
+  /**
+   * Whether to use an existing snapshot script instead of creating a new one.
+   */
+  useExistingSnapshotScript?: boolean
+  /**
+   * Function to update the contents of an existing snapshot script.
+   */
+  updateSnapshotScriptContents?: ((contents: string) => string)
 
   /**
    * Generated snapshot script, needs to be set before calling `makeSnapshot`.
@@ -201,13 +200,14 @@ export class SnapshotGenerator {
     const {
       cacheDir,
       nodeModulesOnly,
-      previousDeferred,
-      previousHealthy,
-      previousNoRewrite,
       forceNoRewrite,
       flags: mode,
       nodeEnv,
+      cypressInternalEnv,
       minify,
+      integrityCheckSource,
+      useExistingSnapshotScript,
+      updateSnapshotScriptContents,
     }: GenerationOpts = Object.assign(
       getDefaultGenerationOpts(projectBaseDir),
       opts,
@@ -226,14 +226,15 @@ export class SnapshotGenerator {
     this.electronVersion = resolveElectronVersion(projectBaseDir)
 
     this.nodeModulesOnly = nodeModulesOnly
-    this.previousDeferred = new Set(previousDeferred)
-    this.previousHealthy = new Set(previousHealthy)
-    this.previousNoRewrite = new Set(previousNoRewrite)
     this.forceNoRewrite = new Set(forceNoRewrite)
     this.nodeEnv = nodeEnv
+    this.cypressInternalEnv = cypressInternalEnv
     this._flags = new GeneratorFlags(mode)
     this.bundlerPath = getBundlerPath()
     this.minify = minify
+    this.integrityCheckSource = integrityCheckSource
+    this.useExistingSnapshotScript = useExistingSnapshotScript
+    this.updateSnapshotScriptContents = updateSnapshotScriptContents
 
     const auxiliaryDataKeys = Object.keys(this.auxiliaryData || {})
 
@@ -242,16 +243,13 @@ export class SnapshotGenerator {
       cacheDir,
       snapshotScriptPath: this.snapshotScriptPath,
       nodeModulesOnly: this.nodeModulesOnly,
-      previousDeferred: this.previousDeferred.size,
-      previousHealthy: this.previousHealthy.size,
-      previousNoRewrite: this.previousNoRewrite.size,
       forceNoRewrite: this.forceNoRewrite.size,
       auxiliaryData: auxiliaryDataKeys,
     })
   }
 
   private _addGitignore () {
-    const gitignore = 'snapshot.js\nbase.snapshot.js.map\nprocessed.snapshot.js.map\nesbuild-meta.json\nsnapshot-meta.json\nsnapshot-entry.js\n'
+    const gitignore = 'snapshot.js\nbase.snapshot.js.map\nprocessed.snapshot.js.map\nesbuild-meta.json\nsnapshot-entry.js\n'
 
     const gitignorePath = join(this.cacheDir, '.gitignore')
 
@@ -262,6 +260,19 @@ export class SnapshotGenerator {
    * Creates the snapshot script for the provided configuration
    */
   async createScript () {
+    if (this.useExistingSnapshotScript) {
+      let contents = await fs.promises.readFile(this.snapshotScriptPath, 'utf8')
+
+      if (this.updateSnapshotScriptContents) {
+        contents = this.updateSnapshotScriptContents(contents)
+      }
+
+      this.snapshotScript = Buffer.from(contents)
+      await fs.promises.writeFile(this.snapshotScriptPath, this.snapshotScript)
+
+      return
+    }
+
     let deferred
     let norewrite
 
@@ -276,12 +287,10 @@ export class SnapshotGenerator {
         this.cacheDir,
         {
           nodeModulesOnly: this.nodeModulesOnly,
-          previousDeferred: this.previousDeferred,
-          previousHealthy: this.previousHealthy,
-          previousNoRewrite: this.previousNoRewrite,
           forceNoRewrite: this.forceNoRewrite,
-          useHashBasedCache: this._flags.has(Flag.ReuseDoctorArtifacts),
           nodeEnv: this.nodeEnv,
+          cypressInternalEnv: this.cypressInternalEnv,
+          integrityCheckSource: this.integrityCheckSource,
         },
       ))
     } catch (err) {
@@ -308,7 +317,9 @@ export class SnapshotGenerator {
         baseSourcemapExternalPath: this.snapshotScriptPath.replace('snapshot.js', 'base.snapshot.js.map'),
         processedSourcemapExternalPath: this.snapshotScriptPath.replace('snapshot.js', 'processed.snapshot.js.map'),
         nodeEnv: this.nodeEnv,
+        cypressInternalEnv: this.cypressInternalEnv,
         supportTypeScript: this.nodeModulesOnly,
+        integrityCheckSource: this.integrityCheckSource,
       })
     } catch (err) {
       logError('Failed creating script')
@@ -382,12 +393,10 @@ export class SnapshotGenerator {
         this.cacheDir,
         {
           nodeModulesOnly: this.nodeModulesOnly,
-          previousHealthy: this.previousHealthy,
-          previousDeferred: this.previousDeferred,
-          previousNoRewrite: this.previousNoRewrite,
           forceNoRewrite: this.forceNoRewrite,
-          useHashBasedCache: this._flags.has(Flag.ReuseDoctorArtifacts),
           nodeEnv: this.nodeEnv,
+          cypressInternalEnv: this.cypressInternalEnv,
+          integrityCheckSource: this.integrityCheckSource,
         },
       ))
     } catch (err) {
@@ -412,7 +421,9 @@ export class SnapshotGenerator {
         resolverMap: this.resolverMap,
         auxiliaryData: this.auxiliaryData,
         nodeEnv: this.nodeEnv,
+        cypressInternalEnv: this.cypressInternalEnv,
         supportTypeScript: this.nodeModulesOnly,
+        integrityCheckSource: this.integrityCheckSource,
       })
     } catch (err) {
       logError('Failed creating script')

@@ -28,35 +28,37 @@
 
 <template>
   <div>
-    <div class="rounded border-1 h-40px w-full inline-flex items-center hocus-default focus-within-default truncate">
+    <div class="rounded border h-[40px] w-full inline-flex items-center hocus-default focus-within-default truncate">
       <FileMatchButton
         :expanded="expanded"
+        :aria-label="t('components.fileSearch.expandToSearchByExtensions')"
         @click="toggleExpanded()"
       >
         <span v-if="!expanded">{{ localExtensionPattern }}</span>
       </FileMatchButton>
-      <div class="flex-grow min-w-min inline-flex items-center group">
+      <div class="grow min-w-min inline-flex items-center group">
         <i-cy-magnifying-glass_x16
           v-if="!expanded"
-          class="mr-8px ml-12px inline-block icon-light-gray-50 icon-dark-gray-500 group-focus-within:icon-light-indigo-50 group-focus-within:icon-dark-indigo-400"
+          class="mr-[8px] ml-[12px] inline-block icon-light-gray-50 icon-dark-gray-500 group-focus-within:icon-light-indigo-50 group-focus-within:icon-dark-indigo-400"
         />
 
         <FileMatchInput
           v-if="expanded"
           v-model="localExtensionPattern"
-          class="ml-12px"
+          class="ml-[12px]"
+          :aria-label="t('components.fileSearch.byExtensionInput')"
           :placeholder="t('components.fileSearch.byExtensionInput')"
         />
         <FileMatchInput
           v-else
           v-model="localPattern"
-          aria-label="file-name-input"
+          aria-label="Search by filename"
           :placeholder="t('components.fileSearch.byFilenameInput')"
         />
       </div>
       <slot name="matches">
         <FileMatchIndicator
-          class="mr-8px truncate"
+          class="mr-[8px] truncate"
           data-cy="file-match-indicator"
         >
           {{ indicatorText }}
@@ -65,13 +67,14 @@
     </div>
 
     <div
-      class="rounded border-1 h-40px mt-8px w-full inline-flex items-center hocus-default focus-within-default"
+      class="rounded border h-[40px] mt-[8px] w-full inline-flex items-center hocus-default focus-within-default"
       :class="{ 'hidden' : !expanded }"
     >
-      <div class="flex-grow inline-flex items-center group">
-        <i-cy-magnifying-glass_x16 class="mr-8px ml-12px inline-block icon-light-gray-50 icon-dark-gray-500 group-focus-within:icon-light-indigo-50 group-focus-within:icon-dark-indigo-400" />
+      <div class="grow inline-flex items-center group">
+        <i-cy-magnifying-glass_x16 class="mr-[8px] ml-[12px] inline-block icon-light-gray-50 icon-dark-gray-500 group-focus-within:icon-light-indigo-50 group-focus-within:icon-dark-indigo-400" />
         <FileMatchInput
           v-model="localPattern"
+          :aria-label="t('components.fileSearch.byFilenameInput')"
           :placeholder="t('components.fileSearch.byFilenameInput')"
         />
       </div>

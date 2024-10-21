@@ -1,27 +1,37 @@
 {
+  "configMigration": true,
+  "dependencyDashboard": true,
   "extends": [
-    "config:base"
+    ":semanticPrefixFixDepsChoreOthers",
+    "group:monorepos",
+    "group:recommended",
+    "replacements:all",
+    "workarounds:all"
   ],
-  "automerge": true,
-  "major": {
-    "automerge": false
-  },
-  "minor": {
-    "automerge": false
-  },
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/system-tests/projects/**"
+  ],
+  "labels": [
+    "type: dependencies"
+  ],
+  "packageRules": [
+    {
+      "automerge": true,
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ]
+    }
+  ],
+  "postUpdateOptions": [
+    "yarnDedupeHighest"
+  ],
+  "prConcurrentLimit": 4,
+  "prHourlyLimit": 1,
   "rangeStrategy": "bump",
   "separateMultipleMajor": true,
-  "labels": [
-    "type: dependencies",
-    "renovate"
-  ],
-  "commitMessageSuffix": "🌟",
-  "prHourlyLimit": 1,
-  "prConcurrentLimit": 1,
-  "updateNotScheduled": false,
-  "timezone": "America/New_York",
-  "schedule": [
-    "before 3am on the first day of the month"
-  ],
-  "dependencyDashboardApproval": true
+  "timezone": "America/New_York"
 }

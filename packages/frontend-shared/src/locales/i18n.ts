@@ -5,7 +5,7 @@ import {
 
 import type enUS from './en-US.json'
 // Imports a special compiled messages object
-import compiledMessages from '@intlify/vite-plugin-vue-i18n/messages'
+import compiledMessages from '@intlify/unplugin-vue-i18n/messages'
 
 // The raw strings for the default language (en) used for testing
 import rawJsonMessages from './en-US.json?raw'
@@ -19,7 +19,11 @@ export const VueI18n = createI18n()
 export function createI18n (opts = {}) {
   return _createI18n<MessageSchema, 'en-US'>({
     locale: 'en-US',
-    messages: compiledMessages,
+    /**
+    * precompiled messages from unplugin-vue-i18n do not include explicit keys derived from
+    * the filenames of the raw message sources, so it must be coerced.
+    */
+    messages: compiledMessages as { 'en-US': MessageSchema },
     ...opts,
   })
 }

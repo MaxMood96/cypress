@@ -34,6 +34,7 @@ const setGlobals = read('set-globals')
  * that are bundled
  * @property includeStrictVerifiers see {@link GenerationOpts} includeStrictVerifiers
  * @property nodeEnv see {@link GenerationOpts} nodeEnv
+ * @property cypressInternalEnv see {@link GenerationOpts} cypressInternalEnv
  * @property basedir the base dir of the project for which we are creating the
  * snapshot
  * @property sourceMap {@link Buffer} with content of raw sourcemaps
@@ -47,10 +48,12 @@ export type BlueprintConfig = {
   customRequireDefinitions: Buffer
   includeStrictVerifiers: boolean
   nodeEnv: string
+  cypressInternalEnv: string
   basedir: string
   sourceMap: Buffer | undefined
   processedSourceMapPath: string | undefined
   supportTypeScript: boolean
+  integrityCheckSource: string | undefined
 }
 
 const pathSep = path.sep === '\\' ? '\\\\' : path.sep
@@ -63,7 +66,7 @@ const pathSep = path.sep === '\\' ? '\\\\' : path.sep
  * When rendering the snapshot script we take care of the following
  * (in order of occurrence in the rendered script):
  *
- * 1. We embedd the path separator so that we have it available inside the
+ * 1. We embed the path separator so that we have it available inside the
  *    snapshot without having to refer to the `path` module
  *
  * 2. We also include helper methods like `cannotAccess` which are invoked
@@ -98,89 +101,122 @@ export function scriptFromBlueprint (config: BlueprintConfig): {
     customRequireDefinitions,
     includeStrictVerifiers,
     nodeEnv,
+    cypressInternalEnv,
     basedir,
     sourceMap,
     supportTypeScript,
+    integrityCheckSource,
   } = config
 
   const normalizedMainModuleRequirePath = forwardSlash(mainModuleRequirePath)
 
   const wrapperOpen = Buffer.from(
     `
-const PATH_SEP = '${pathSep}'
-var snapshotAuxiliaryData = ${auxiliaryData}
+(function () {
+  const PATH_SEP = '${pathSep}'
+  ${integrityCheckSource || ''}
 
-function generateSnapshot() {
-  //
-  // <process>
-  //
-  function cannotAccess(proto, prop) {
-    return function () {
-      throw 'Cannot access ' + proto + '.' + prop + ' during snapshot creation'
+  function generateSnapshot() {
+    //
+    // <process>
+    //
+    function cannotAccess(proto, prop) {
+      return function () {
+        throw 'Cannot access ' + proto + '.' + prop + ' during snapshot creation'
+      }
     }
-  }
-  function getPrevent(proto, prop) {
-    return {
-      get: cannotAccess(proto, prop)
+    function getPrevent(proto, prop) {
+      return {
+        get: cannotAccess(proto, prop)
+      }
     }
-  }
 
-  let process = {}
-  Object.defineProperties(process, {
-    platform: {
-      value: '${processPlatform}',
-      enumerable: false,
-    },
-    argv: {
-      value: [],
-      enumerable: false,
-    },
-    env: {
-      value: {
-        NODE_ENV: '${nodeEnv}',
+    let process = {}
+    Object.defineProperties(process, {
+      platform: {
+        value: '${processPlatform}',
+        enumerable: false,
       },
-      enumerable: false,
-    },
-    version: {
-      value: '${processNodeVersion}',
-      enumerable: false,
-    },
-    versions: {
-      value: { node: '${processNodeVersion}' },
-      enumerable: false,
-    },
-    nextTick: getPrevent('process', 'nextTick')
-  })
+      argv: {
+        value: [],
+        enumerable: false,
+      },
+      env: {
+        value: {
+          NODE_ENV: '${nodeEnv}',
+          CYPRESS_INTERNAL_ENV: '${cypressInternalEnv}',
+        },
+        enumerable: false,
+      },
+      version: {
+        value: '${processNodeVersion}',
+        enumerable: false,
+      },
+      versions: {
+        value: { node: '${processNodeVersion}' },
+        enumerable: false,
+      },
+      nextTick: getPrevent('process', 'nextTick')
+    })
 
-  function get_process() {
-    return process
-  }
-  //
-  // </process>
-  //
+    function get_process() {
+      return process
+    }
+    //
+    // </process>
+    //
 
-  ${globals}
-  ${includeStrictVerifiers ? strictGlobals : ''}
+    ${globals}
+    ${includeStrictVerifiers ? strictGlobals : ''}
 `,
     'utf8',
   )
   const wrapperClose = Buffer.from(
-    `
-  ${customRequire}
-  ${includeStrictVerifiers ? 'require.isStrict = true' : ''}
+      `
+    ${customRequire}
+    ${includeStrictVerifiers ? 'require.isStrict = true' : ''}
 
-  customRequire(${normalizedMainModuleRequirePath}, ${normalizedMainModuleRequirePath})
-  return {
-    customRequire,
-    setGlobals: ${setGlobals},
+    customRequire(${normalizedMainModuleRequirePath}, ${normalizedMainModuleRequirePath})
+    const result = {}
+    Object.defineProperties(result, {
+      customRequire: {
+        writable: false,
+        value: customRequire
+      },
+      setGlobals: {
+        writable: false,
+        value: ${setGlobals}
+      },
+      snapshotAuxiliaryData: {
+        writable: false,
+        value: ${auxiliaryData},
+      },
+    })
+    return result
   }
-}
 
-var snapshotResult = generateSnapshot.call({})
-var supportTypeScript = ${supportTypeScript}
-generateSnapshot = null
+  let numberOfGetSnapshotResultCalls = 0
+  const snapshotResult = generateSnapshot.call({})
+  Object.defineProperties(this, {
+    getSnapshotResult: {
+      writable: false,
+      value: function () {
+        if (numberOfGetSnapshotResultCalls > 0) {
+          throw new Error('getSnapshotResult can only be called once')
+        }
+        numberOfGetSnapshotResultCalls++
+        return snapshotResult
+      },
+    },
+    supportTypeScript: {
+      writable: false,
+      value: ${supportTypeScript},
+    },
+  })
+  generateSnapshot = null
+}).call(this)
 `,
-    'utf8',
+      'utf8',
   )
 
   const buffers = [wrapperOpen, customRequireDefinitions, wrapperClose]

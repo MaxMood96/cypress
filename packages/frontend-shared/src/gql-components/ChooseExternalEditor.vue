@@ -1,12 +1,14 @@
 <template>
   <div class="flex items-center">
+    <!-- @vue-expect-error -->
     <Select
       :model-value="selectedEditor"
       :options="editorOptions"
       item-value="name"
       item-key="id"
+      :label-id="labelId"
       :placeholder="t('settingsPage.editor.noEditorSelectedPlaceholder')"
-      class="w-400px"
+      class="w-[400px]"
       @update:model-value="updateEditor"
     >
       <template #input-prefix="{ value }">
@@ -32,9 +34,9 @@
 
   <div
     v-if="editorToUse === 'custom'"
-    class="flex py-16px pb-4px items-center"
+    class="flex py-[16px] pb-[4px] items-center"
   >
-    <div class="w-400px">
+    <div class="w-[400px]">
       <Input
         id="customPath"
         v-model="customBinary"
@@ -117,6 +119,7 @@ fragment ChooseExternalEditor on Query {
 
 const props = defineProps<{
   gql: ChooseExternalEditorFragment
+  labelId: string
 }>()
 
 const { t } = useI18n()

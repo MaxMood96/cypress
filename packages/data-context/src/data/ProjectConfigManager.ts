@@ -18,7 +18,9 @@ import { CypressEnv } from './CypressEnv'
 import { autoBindDebug } from '../util/autoBindDebug'
 import type { EventRegistrar } from './EventRegistrar'
 import type { DataContext } from '../DataContext'
-import { DependencyToInstall, isDependencyInstalled, WIZARD_BUNDLERS, WIZARD_DEPENDENCIES, WIZARD_FRAMEWORKS } from '@packages/scaffold-config'
+import { isDependencyInstalled, WIZARD_BUNDLERS } from '@packages/scaffold-config'
+import type { OTLPTraceExporterCloud } from '@packages/telemetry'
+import { telemetry } from '@packages/telemetry'
 
 const debug = debugLib(`cypress:lifecycle:ProjectConfigManager`)
 
@@ -135,6 +137,12 @@ export class ProjectConfigManager {
           ...loadConfigReply.requires,
           this.configFilePath,
         ])
+
+        // Only call "to{App,Launchpad}" once the config is done loading.
+        // Calling this in a "finally" would trigger this emission for every
+        // call to get the config (which we do a lot)
+        this.options.ctx.emitter.toLaunchpad()
+        this.options.ctx.emitter.toApp()
       }
 
       return loadConfigReply.initialConfig
@@ -147,10 +155,10 @@ export class ProjectConfigManager {
       this._state = 'errored'
       await this.closeWatchers()
 
-      throw error
-    } finally {
       this.options.ctx.emitter.toLaunchpad()
       this.options.ctx.emitter.toApp()
+
+      throw error
     }
   }
 
@@ -185,14 +193,20 @@ export class ProjectConfigManager {
 
     // Use a map since sometimes the same dependency can appear in `bundler` and `framework`,
     // for example webpack appears in both `bundler: 'webpack', framework: 'react-scripts'`
-    const unsupportedDeps = new Map<DependencyToInstall['dependency']['type'], DependencyToInstall>()
+    const unsupportedDeps = new Map<Cypress.DependencyToInstall['dependency']['type'], Cypress.DependencyToInstall>()
 
     if (!bundler) {
       return
     }
 
-    const isFrameworkSatisfied = async (bundler: typeof WIZARD_BUNDLERS[number], framework: typeof WIZARD_FRAMEWORKS[number]) => {
-      for (const dep of await (framework.dependencies(bundler.type, this.options.projectRoot))) {
+    const isFrameworkSatisfied = async (bundler: typeof WIZARD_BUNDLERS[number], framework: Cypress.ResolvedComponentFrameworkDefinition) => {
+      const deps = await framework.dependencies(bundler.type, this.options.projectRoot)
+
+      debug('deps are %o', deps)
+
+      for (const dep of deps) {
+        debug('detecting %s in %s', dep.dependency.name, this.options.projectRoot)
+
         const res = await isDependencyInstalled(dep.dependency, this.options.projectRoot)
 
         if (!res.satisfied) {
@@ -203,9 +217,9 @@ export class ProjectConfigManager {
       return true
     }
 
-    const frameworks = WIZARD_FRAMEWORKS.filter((x) => x.configFramework === devServerOptions.framework)
+    const frameworks = this.options.ctx.coreData.wizard.frameworks.filter((x) => x.configFramework === devServerOptions.framework)
 
-    const mismatchedFrameworkDeps = new Map<typeof WIZARD_DEPENDENCIES[number]['type'], DependencyToInstall>()
+    const mismatchedFrameworkDeps = new Map<string, Cypress.DependencyToInstall>()
 
     let isSatisfied = false
 
@@ -236,13 +250,17 @@ export class ProjectConfigManager {
   }
 
   private async setupNodeEvents (loadConfigReply: LoadConfigReply): Promise<void> {
+    const nodeEventsSpan = telemetry.startSpan({ name: 'dataContext:setupNodeEvents' })
+
     assert(this._eventsIpc, 'Expected _eventsIpc to be defined at this point')
     this._state = 'loadingNodeEvents'
 
     try {
       assert(this._testingType, 'Cannot setup node events without a testing type')
       this._registeredEventsTarget = this._testingType
-      const config = await this.getFullInitialConfig()
+      const config = await this.getFullInitialConfig();
+
+      (telemetry.exporter() as OTLPTraceExporterCloud)?.attachProjectId(config.projectId)
 
       const setupNodeEventsReply = await this._eventsIpc.callSetupNodeEventsWithConfig(this._testingType, config, this.options.handlers)
 
@@ -259,6 +277,7 @@ export class ProjectConfigManager {
 
       throw error
     } finally {
+      nodeEventsSpan?.end()
       this.options.ctx.emitter.toLaunchpad()
       this.options.ctx.emitter.toApp()
     }
@@ -343,7 +362,8 @@ export class ProjectConfigManager {
       }
 
       this._eventsIpc = new ProjectConfigIpc(
-        this.options.ctx.nodePath,
+        this.options.ctx.coreData.app.nodePath,
+        this.options.ctx.coreData.app.nodeVersion,
         this.options.projectRoot,
         this.configFilePath,
         this.options.configFile,
@@ -465,7 +485,7 @@ export class ProjectConfigManager {
     /*
       Used to detect the correct file path when a test fails.
       It is derived and assigned in the packages/driver in stack_utils.
-      It's needed to show the correct link to files in repo mgmt tools like GitHub in the dashboard.
+      It's needed to show the correct link to files in repo mgmt tools like GitHub in Cypress Cloud.
       Right now we assume the repoRoot is where the `.git` dir is located.
     */
     return this.options.ctx.git?.gitBaseDir
@@ -519,7 +539,7 @@ export class ProjectConfigManager {
           }
         }
 
-        if (browser.family !== 'chromium' && fullConfig.chromeWebSecurity) {
+        if (browser.family !== 'chromium' && !fullConfig.chromeWebSecurity) {
           return {
             ...browser,
             warning: browser.warning || getError('CHROME_WEB_SECURITY_NOT_SUPPORTED', browser.name).message,
@@ -592,6 +612,34 @@ export class ProjectConfigManager {
     }
 
     return true
+  }
+
+  /**
+   * Informs the child process if the main process will soon disconnect.
+   * @returns promise
+   */
+  mainProcessWillDisconnect (): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this._eventsIpc) {
+        debug(`mainProcessWillDisconnect message not set, no IPC available`)
+        reject()
+
+        return
+      }
+
+      this._eventsIpc.send('main:process:will:disconnect')
+
+      // If for whatever reason we don't get an ack in 5s, bail.
+      const timeoutId = setTimeout(() => {
+        debug(`mainProcessWillDisconnect message timed out`)
+        reject()
+      }, 5000)
+
+      this._eventsIpc.on('main:process:will:disconnect:ack', () => {
+        clearTimeout(timeoutId)
+        resolve()
+      })
+    })
   }
 
   private async closeWatchers () {

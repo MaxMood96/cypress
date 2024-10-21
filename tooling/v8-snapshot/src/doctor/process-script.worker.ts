@@ -65,6 +65,8 @@ const snapshotVerifier = new SnapshotVerifier()
  * @param entryPoint the entry file to use during verification
  * @param nodeEnv the string to provide to `process.env.NODE_ENV` during
  * script verification
+ * @param cypressInternalEnv the string to provide to `process.env.CYPRESS_INTERNAL_ENV`
+ * during script verification
  */
 export function processScript ({
   bundlePath,
@@ -73,7 +75,9 @@ export function processScript ({
   entryFilePath,
   entryPoint,
   nodeEnv,
+  cypressInternalEnv,
   supportTypeScript,
+  integrityCheckSource,
 }: ProcessScriptOpts): ProcessScriptResult {
   const bundleContent = getBundle(bundlePath, bundleHash)
   let snapshotScript
@@ -83,9 +87,11 @@ export function processScript ({
       entryPoint,
       includeStrictVerifiers: true,
       nodeEnv,
+      cypressInternalEnv,
       baseSourcemapExternalPath: undefined,
       processedSourcemapExternalPath: undefined,
       supportTypeScript,
+      integrityCheckSource,
     }).script
   } catch (err: any) {
     return { outcome: 'failed:assembleScript', error: err }

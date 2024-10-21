@@ -1,15 +1,23 @@
+import { gql } from '@urql/core'
 import type { DataContext } from '..'
 import Debug from 'debug'
+import type { LocalTestCountsInput } from '@packages/graphql/src/gen/nxs.gen'
 
 const pkg = require('@packages/root')
 
 const debug = Debug('cypress:data-context:actions:EventCollectorActions')
 
-interface CollectableEvent {
+interface CollectibleEvent {
   campaign: string
   messageId: string
   medium: string
   cohort?: string
+  payload?: object
+  machineId?: string
+}
+
+type EventInputs = {
+  localTestCounts?: LocalTestCountsInput
 }
 
 /**
@@ -23,23 +31,29 @@ export class EventCollectorActions {
     debug('Using %s environment for Event Collection', cloudEnv)
   }
 
-  async recordEvent (event: CollectableEvent): Promise<boolean> {
+  async recordEvent (event: CollectibleEvent, includeMachineId: boolean): Promise<boolean> {
     try {
-      const dashboardUrl = this.ctx.cloud.getDashboardUrl(cloudEnv)
+      const cloudUrl = this.ctx.cloud.getCloudUrl(cloudEnv)
+      const eventUrl = includeMachineId ? `${cloudUrl}/machine-collect` : `${cloudUrl}/anon-collect`
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-cypress-version': pkg.version,
+      }
+
+      if (includeMachineId) {
+        event.machineId = (await this.ctx.coreData.machineId) || undefined
+      }
 
       await this.ctx.util.fetch(
-        `${dashboardUrl}/anon-collect`,
+        eventUrl,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-cypress-version': pkg.version,
-          },
+          headers,
           body: JSON.stringify(event),
         },
       )
 
-      debug(`Recorded event: %o`, event)
+      debug(`Recorded %s event: %o`, includeMachineId ? 'machine-linked' : 'anonymous', event)
 
       return true
     } catch (err) {
@@ -47,5 +61,22 @@ export class EventCollectorActions {
 
       return false
     }
+  }
+
+  recordEventGQL (eventInputs: EventInputs) {
+    const RECORD_EVENT_GQL = gql`
+      mutation EventCollectorActions_RecordEvent($localTestCounts: LocalTestCountsInput) {
+        cloudRecordEvent(localTestCounts: $localTestCounts)
+      }
+    `
+
+    debug('recordEventGQL final variables %o', eventInputs)
+
+    return this.ctx.cloud.executeRemoteGraphQL({
+      operationType: 'mutation',
+      fieldName: 'cloudRecordEvent',
+      operationDoc: RECORD_EVENT_GQL,
+      operationVariables: eventInputs,
+    })
   }
 }

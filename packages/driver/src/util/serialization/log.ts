@@ -327,6 +327,13 @@ export const reifyLogLikeFromSerialization = (props, matchElementsAgainstSnapsho
  * @returns a serializable form of a snapshot, including a serializable <body> with styles
  */
 export const preprocessSnapshotForSerialization = (snapshot) => {
+  // if the protocol is enabled, we don't need to preprocess the snapshot since it is serializable,
+  // also make sure numTestsKeptInMemory is 0, otherwise we will want to preprocess the snapshot
+  // (the driver test's set numTestsKeptInMemory to 1 in run mode to verify the snapshots)
+  if (Cypress.config('protocolEnabled') && Cypress.config('numTestsKeptInMemory') === 0) {
+    return snapshot
+  }
+
   try {
     const preprocessedSnapshot = preprocessLogLikeForSerialization(snapshot, true)
 
@@ -408,7 +415,10 @@ export const preprocessLogForSerialization = (logAttrs) => {
 export const reifyLogFromSerialization = (logAttrs) => {
   let { snapshots, ... logAttrsRest } = logAttrs
 
-  if (snapshots) {
+  // if the protocol is enabled, we don't need to reify the snapshot since the snapshot was serializable coming into the primary instance of Cypress.
+  // also make sure numTestsKeptInMemory is 0, otherwise we will want to preprocess the snapshot
+  // (the driver test's set numTestsKeptInMemory to 1 in run mode to verify the snapshots)
+  if (snapshots && !(Cypress.config('protocolEnabled') && Cypress.config('numTestsKeptInMemory') === 0)) {
     snapshots = snapshots.filter((snapshot) => !!snapshot).map((snapshot) => reifySnapshotFromSerialization(snapshot))
   }
 

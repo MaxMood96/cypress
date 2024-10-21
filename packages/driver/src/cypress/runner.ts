@@ -1,4 +1,3 @@
-/* eslint-disable prefer-rest-params */
 import _ from 'lodash'
 import dayjs from 'dayjs'
 import Promise from 'bluebird'
@@ -9,21 +8,24 @@ import $errUtils from './error_utils'
 import $stackUtils from './stack_utils'
 import { getResolvedTestConfigOverride } from '../cy/testConfigOverrides'
 import debugFn from 'debug'
-import type { Emissions } from '@packages/types'
+import type { Emissions, TestFilter } from '@packages/types'
+import { SKIPPED_DUE_TO_BROWSER_MESSAGE } from './mocha'
 
 const mochaCtxKeysRe = /^(_runnable|test)$/
 const betweenQuotesRe = /\"(.+?)\"/
 
 const HOOKS = ['beforeAll', 'beforeEach', 'afterEach', 'afterAll'] as const
-const TEST_BEFORE_RUN_ASYNC_EVENT = 'runner:test:before:run:async'
 // event fired before hooks and test execution
+const TEST_BEFORE_RUN_ASYNC_EVENT = 'runner:test:before:run:async'
 const TEST_BEFORE_RUN_EVENT = 'runner:test:before:run'
+const TEST_BEFORE_AFTER_RUN_ASYNC_EVENT = 'runner:test:before:after:run:async'
+const TEST_AFTER_RUN_ASYNC_EVENT = 'runner:test:after:run:async'
 const TEST_AFTER_RUN_EVENT = 'runner:test:after:run'
-const TEST_AFTER_RUN_ASYNC_EVENT = 'runner:runnable:after:run:async'
+const RUNNABLE_AFTER_RUN_ASYNC_EVENT = 'runner:runnable:after:run:async'
 
 const RUNNABLE_LOGS = ['routes', 'agents', 'commands', 'hooks'] as const
 const RUNNABLE_PROPS = [
-  '_testConfig', 'id', 'order', 'title', '_titlePath', 'root', 'hookName', 'hookId', 'err', 'state', 'failedFromHookId', 'body', 'speed', 'type', 'duration', 'wallClockStartedAt', 'wallClockDuration', 'timings', 'file', 'originalTitle', 'invocationDetails', 'final', 'currentRetry', 'retries', '_slow',
+  '_cypressTestStatusInfo', '_testConfig', 'id', 'order', 'title', '_titlePath', 'root', 'hookName', 'hookId', 'err', 'state', 'pending', 'failedFromHookId', 'body', 'speed', 'type', 'duration', 'wallClockStartedAt', 'wallClockDuration', 'timings', 'file', 'originalTitle', 'invocationDetails', 'final', 'currentRetry', 'retries', '_slow',
 ] as const
 
 const debug = debugFn('cypress:driver:runner')
@@ -32,8 +34,10 @@ const debugErrors = debugFn('cypress:driver:errors')
 const RUNNER_EVENTS = [
   TEST_BEFORE_RUN_ASYNC_EVENT,
   TEST_BEFORE_RUN_EVENT,
-  TEST_AFTER_RUN_EVENT,
+  TEST_BEFORE_AFTER_RUN_ASYNC_EVENT,
   TEST_AFTER_RUN_ASYNC_EVENT,
+  TEST_AFTER_RUN_EVENT,
+  RUNNABLE_AFTER_RUN_ASYNC_EVENT,
 ] as const
 
 export type HandlerType = 'error' | 'unhandledrejection'
@@ -42,7 +46,7 @@ const duration = (before: Date, after: Date) => {
   return Number(before) - Number(after)
 }
 
-const fire = (event: typeof RUNNER_EVENTS[number], runnable, Cypress) => {
+const fire = (event: typeof RUNNER_EVENTS[number], runnable, Cypress, ...args) => {
   debug('fire: %o', { event })
   if (runnable._fired == null) {
     runnable._fired = {}
@@ -55,7 +59,7 @@ const fire = (event: typeof RUNNER_EVENTS[number], runnable, Cypress) => {
     return
   }
 
-  return Cypress.action(event, wrap(runnable), runnable)
+  return Cypress.action(event, wrap(runnable), runnable, ...args)
 }
 
 const fired = (event: typeof RUNNER_EVENTS[number], runnable) => {
@@ -70,12 +74,28 @@ const testBeforeRunAsync = (test, Cypress) => {
   })
 }
 
+const testBeforeAfterRunAsync = (test, Cypress, ...args) => {
+  return Promise.try(() => {
+    if (!fired(TEST_BEFORE_AFTER_RUN_ASYNC_EVENT, test)) {
+      return fire(TEST_BEFORE_AFTER_RUN_ASYNC_EVENT, test, Cypress, ...args)
+    }
+  })
+}
+
+const testAfterRunAsync = (test, Cypress) => {
+  return Promise.try(() => {
+    if (!fired(TEST_AFTER_RUN_ASYNC_EVENT, test)) {
+      return fire(TEST_AFTER_RUN_ASYNC_EVENT, test, Cypress)
+    }
+  })
+}
+
 const runnableAfterRunAsync = (runnable, Cypress) => {
   runnable.clearTimeout()
 
   return Promise.try(() => {
     // NOTE: other events we do not fire more than once, but this needed to change for test-retries
-    return fire(TEST_AFTER_RUN_ASYNC_EVENT, runnable, Cypress)
+    return fire(RUNNABLE_AFTER_RUN_ASYNC_EVENT, runnable, Cypress)
   })
 }
 
@@ -155,7 +175,7 @@ const wrap = (runnable): Record<string, any> | null => {
 
 // Reduce runnable down to its props and collections.
 // Sent to the Reporter to populate command log
-// and send to the Dashboard when in record mode.
+// and send to Cypress Cloud when in record mode.
 const wrapAll = (runnable): Record<string, any> => {
   return _.extend(
     {},
@@ -345,8 +365,18 @@ const isLastSuite = (suite, tests) => {
 // if we're the last test in the tests array or
 // if we failed from a hook and that hook was 'before'
 // since then mocha skips the remaining tests in the suite
-const lastTestThatWillRunInSuite = (test, tests) => {
+const lastTestThatWillRunInSuite = (test, tests): boolean => {
   return isLastTest(test, tests) || (test.failedFromHookId && (test.hookName === 'before all'))
+}
+
+const nextTestThatWillRunInSuite = (test, tests) => {
+  if (test.failedFromHookId && (test.hookName === 'before all')) {
+    return null
+  }
+
+  const index = _.findIndex(tests, { id: test.id })
+
+  return index < tests.length - 1 ? tests[index + 1] : null
 }
 
 const isLastTest = (test, tests) => {
@@ -357,7 +387,7 @@ const isRootSuite = (suite) => {
   return suite && suite.root
 }
 
-const overrideRunnerHook = (Cypress, _runner, getTestById, getTest, setTest, getTests) => {
+const overrideRunnerHook = (Cypress, _runner, getTestById, getTest, setTest, getTests, cy) => {
   // bail if our _runner doesn't have a hook.
   // useful in tests
   if (!_runner.hook) {
@@ -442,8 +472,8 @@ const overrideRunnerHook = (Cypress, _runner, getTestById, getTest, setTest, get
         break
     }
 
-    const newArgs = [name, $utils.monkeypatchBefore(fn,
-      function () {
+    const newArgs = [name, $utils.monkeypatchBeforeAsync(fn,
+      async function () {
         if (!shouldFireTestAfterRun()) return
 
         setTest(null)
@@ -451,7 +481,26 @@ const overrideRunnerHook = (Cypress, _runner, getTestById, getTest, setTest, get
         if (test.final !== false) {
           test.final = true
           if (test.state === 'passed') {
-            Cypress.action('runner:pass', wrap(test))
+            if (test?._cypressTestStatusInfo?.outerStatus === 'failed') {
+              // We call _runner.fail here instead of in mocha because we need to make sure none of the hooks mutate the current test state, which might trigger
+              // another attempt. This affects our server reporter by reporting the test final status multiple times and incorrect attempt statuses.
+              // We can be sure here that the test is settled and we can fail it appropriately if the condition is met.
+
+              // In this case, since the last attempt of the test does not contain an error, we need to look one up from a previous attempt
+              // and fail the last attempt with this error to appropriate the correct runner lifecycle hooks. However, we still want the
+              // last attempt to be marked as 'passed'. This is where 'forceState' comes into play (see 'calculateTestStatus' in ./driver/src/cypress/mocha.ts)
+
+              // If there are other hooks (such as multiple afterEach hooks) that MIGHT impact the end conditions of the test, we only want to fail this ONCE!
+              const lastTestWithErr = (test.prevAttempts || []).find((t) => t.state === 'failed')
+              // TODO: figure out serialization with this looked up error as it isn't printed to the console reporter properly.
+              const err = lastTestWithErr?.err
+
+              // fail the test as it would in the mocha/lib/runner.js as we can now be certain that no other hooks will impact the state of the test (regardless of hierarchy)
+              _runner.fail(test, err)
+            } else {
+              // If the last test attempt passed, but the outerStatus isn't marked as failed, then we want to emit the mocha 'pass' event.
+              Cypress.action('runner:pass', wrap(test))
+            }
           }
 
           Cypress.action('runner:test:end', wrap(test))
@@ -464,7 +513,43 @@ const overrideRunnerHook = (Cypress, _runner, getTestById, getTest, setTest, get
           _runner._onTestAfterRun = []
         }
 
+        let topSuite = test
+
+        while (topSuite.parent) {
+          topSuite = topSuite.parent
+        }
+
+        const isRunMode = !Cypress.config('isInteractive')
+        const isHeadedNoExit = Cypress.config('browser').isHeaded && !Cypress.config('exit')
+        const shouldAlwaysResetPage = isRunMode && !isHeadedNoExit
+        const isLastTestThatWillRunInSuite = lastTestThatWillRunInSuite(test, getAllSiblingTests(topSuite, getTestById))
+
+        // If we're not in open mode or we're in open mode and not the last test we reset state.
+        // The last test will needs to stay so that the user can see what the end result of the AUT was.
+        if (shouldAlwaysResetPage || !isLastTestThatWillRunInSuite) {
+          let nextTestHasTestIsolationOn
+
+          if (!isLastTestThatWillRunInSuite) {
+            const nextTest = nextTestThatWillRunInSuite(test, getAllSiblingTests(topSuite, getTestById))
+            const nextTestIsolationOverride = nextTest?._testConfig.unverifiedTestConfig.testIsolation
+            const topLevelTestIsolation = Cypress.originalConfig['testIsolation']
+
+            nextTestHasTestIsolationOn = nextTestIsolationOverride || (nextTestIsolationOverride === undefined && topLevelTestIsolation)
+          }
+
+          cy.state('duringUserTestExecution', false)
+          Cypress.primaryOriginCommunicator.toAllSpecBridges('sync:state', { 'duringUserTestExecution': false })
+          // Remove window:load and window:before:load listeners so that navigating to about:blank doesn't fire in user code.
+          cy.removeAllListeners('internal:window:load')
+          cy.removeAllListeners('window:before:load')
+          cy.removeAllListeners('window:load')
+
+          // This will navigate to about:blank if test isolation is on
+          await testBeforeAfterRunAsync(test, Cypress, { nextTestHasTestIsolationOn })
+        }
+
         testAfterRun(test, Cypress)
+        await testAfterRunAsync(test, Cypress)
       })]
 
     return newArgs
@@ -492,7 +577,78 @@ const hasOnly = (suite) => {
   )
 }
 
-const normalizeAll = (suite, initialTests = {}, setTestsById, setTests, getRunnableId, getHookId, getOnlyTestId, getOnlySuiteId, createEmptyOnlyTest) => {
+// Removes a suite and any of it's hooks/tests. Also removes the reference to itself so that it can be GC'd
+const pruneSuite = (emptySuite) => {
+  emptySuite.cleanReferences()
+
+  if (emptySuite.parent) {
+    const parentSuites = emptySuite.parent.suites.filter((suite) => suite !== emptySuite)
+
+    emptySuite.parent.suites = parentSuites
+    emptySuite.parent._onlySuites = emptySuite.parent._onlySuites.filter((suite) => parentSuites.includes(suite))
+    emptySuite.parent = null
+  }
+}
+
+// When in open mode and a "testFilter" is active, tests/suites that do not match the test filter
+// need to be removed as they might have modifiers (.only) that would affect the matched set of tests.
+// This function will recursively iterate through all of the suites and filter out any tests that do not
+// match the specified filter. If the suite is empty after removing the tests, the suite is also removed.
+const pruneEmptySuites = (rootSuite, testFilter: NonNullable<TestFilter>) => {
+  // We want to start at the lowest level so recurse first. We want to prune child suites before parents
+
+  let totalUnfilteredTests = 0
+
+  for (const suite of [...rootSuite.suites]) {
+    totalUnfilteredTests += pruneEmptySuites(suite, testFilter)
+  }
+
+  if (!rootSuite.suites.length && !rootSuite.tests.length) {
+    pruneSuite(rootSuite)
+  }
+
+  if (rootSuite.tests.length) {
+    totalUnfilteredTests += rootSuite.tests.length
+
+    const tests: any[] = []
+    const onlyTests: any[] = []
+
+    for (const test of rootSuite.tests) {
+      // Tests/suites of the shape "it('should', { browser: 'chrome' }, ...)" will have their title
+      // updated with a skipped message. Even if the test is skipped we should still show it in the reporter
+      // so we match the "fullTitle" with the skipped message removed.
+      const fullTitle = test.fullTitle().replaceAll(SKIPPED_DUE_TO_BROWSER_MESSAGE, '')
+
+      if (testFilter.includes(fullTitle)) {
+        tests.push(test)
+
+        if (rootSuite._onlyTests.includes(test)) {
+          onlyTests.push(test)
+        }
+      } else {
+        delete test.fn
+      }
+    }
+
+    rootSuite.tests = tests
+    rootSuite._onlyTests = onlyTests
+
+    if (!rootSuite.tests.length && !rootSuite.suites.length) {
+      pruneSuite(rootSuite)
+    }
+  }
+
+  return totalUnfilteredTests
+}
+
+const normalizeAll = (suite, initialTests = {}, testFilter, setTestsById, setTests, getRunnableId, getHookId, getOnlyTestId, getOnlySuiteId, createEmptyOnlyTest) => {
+  let totalUnfilteredTests = 0
+
+  // Empty suites don't have any impact in run mode so let's avoid this extra work.
+  if (Cypress.config('isInteractive') && testFilter) {
+    totalUnfilteredTests = pruneEmptySuites(suite, testFilter)
+  }
+
   let hasTests = false
 
   // only loop until we find the first test
@@ -511,6 +667,7 @@ const normalizeAll = (suite, initialTests = {}, setTestsById, setTests, getRunna
   // create optimized lookups for the tests without
   // traversing through it multiple times
   const tests: Record<string, any> = {}
+
   const normalizedSuite = normalize(suite, tests, initialTests, getRunnableId, getHookId, getOnlyTestId, getOnlySuiteId, createEmptyOnlyTest)
 
   if (setTestsById) {
@@ -544,6 +701,9 @@ const normalizeAll = (suite, initialTests = {}, setTestsById, setTests, getRunna
 
     return
   })
+
+  normalizedSuite.testFilter = testFilter
+  normalizedSuite.totalUnfilteredTests = totalUnfilteredTests
 
   return normalizedSuite
 }
@@ -780,6 +940,11 @@ const setHookFailureProps = (test, hook, err) => {
   test.duration = hook.duration // TODO: nope (?)
   test.hookName = hookName // TODO: why are we doing this?
   test.failedFromHookId = hook.hookId
+  // There should never be a case where the outerStatus of a test is set AND the last test attempt failed on a hook and the state is passed.
+  // Therefore, if the last test attempt fails on a hook, the outerStatus should also indicate a failure.
+  if (test?._cypressTestStatusInfo?.outerStatus) {
+    test._cypressTestStatusInfo.outerStatus = test.state
+  }
 }
 
 function getTestFromRunnable (runnable) {
@@ -998,11 +1163,28 @@ const _runnerListeners = (_runner, Cypress, _emissions, getTestById, getTest, se
       } else {
         err = $errUtils.appendErrMsg(err, errMessage)
       }
+
+      // If the test never failed and only the hooks did,
+      // we need to attach the metadata of the test to the hook to report the failure correctly to the server reporter.
+      // We calculate it fresh here since it may not be available on the test, which is the case with a beforeEach hook.
+      // as well as maybe incorrect (test passed on first attempt, but after hooks failed)
+      const testStatus = test.calculateTestStatus()
+
+      runnable._cypressTestStatusInfo = {
+        attempts: testStatus.attempts,
+        strategy: testStatus.strategy,
+        // regardless of the test state, we should ultimately fail the test here.
+        outerStatus: runnable.state,
+        shouldAttemptsContinue: false,
+      }
     }
 
     // always set runnable err so we can tap into
     // taking a screenshot on error
     runnable.err = $errUtils.wrapErr(err)
+    // If the last test passed, but the outerStatus of a test failed, we need to correct the status of the test to say 'passed'
+    // (see 'calculateTestStatus' in ./driver/src/cypress/mocha.ts).
+    runnable.state = runnable.forceState || runnable.state
 
     if (!runnable.alreadyEmittedMocha) {
       // do not double emit this event
@@ -1035,7 +1217,6 @@ export default {
     let _uncaughtFn: (() => never) | null = null
     let _resumedAtTestIndex: number | null = null
     let _skipCollectingLogs = true
-
     const _runner = mocha.getRunner()
 
     _runner.suite = mocha.getRootSuite()
@@ -1202,26 +1383,26 @@ export default {
 
     const getOnlySuiteId = () => _onlySuiteId
 
-    overrideRunnerHook(Cypress, _runner, getTestById, getTest, setTest, getTests)
+    overrideRunnerHook(Cypress, _runner, getTestById, getTest, setTest, getTests, cy)
 
     // this forces mocha to enqueue a duplicate test in the case of test retries
     const replacePreviousAttemptWith = (test) => {
       const prevAttempt = _testsById[test.id]
 
-      const prevAttempts = prevAttempt.prevAttempts || []
+      const prevAttempts = prevAttempt?.prevAttempts || []
 
-      const newPrevAttempts = prevAttempts.concat([prevAttempt])
+      const newPrevAttempts = prevAttempt ? prevAttempts.concat([prevAttempt]) : prevAttempts
 
-      delete prevAttempt.prevAttempts
+      if (prevAttempt) {
+        delete prevAttempt.prevAttempts
+      }
 
       test.prevAttempts = newPrevAttempts
 
       replaceTest(test, test.id)
     }
 
-    const maybeHandleRetry = (runnable, err) => {
-      if (!err) return
-
+    const maybeHandleRetryOnFailure = (runnable, err) => {
       const r = runnable
       const isHook = r.type === 'hook'
       const isTest = r.type === 'test'
@@ -1229,8 +1410,62 @@ export default {
       const hookName = isHook && getHookName(r)
       const isBeforeEachHook = isHook && !!hookName.match(/before each/)
       const isAfterEachHook = isHook && !!hookName.match(/after each/)
-      const retryAbleRunnable = isTest || isBeforeEachHook || isAfterEachHook
-      const willRetry = (test._currentRetry < test._retries) && retryAbleRunnable
+      let isBeforeEachThatIsRetryable = false
+      let isAfterEachThatIsRetryable = false
+
+      if (isBeforeEachHook || isAfterEachHook) {
+        if (err) {
+          // If the beforeEach/afterEach hook failed, mark the test attempt as failed
+          test.state = 'failed'
+        }
+
+        // Then calculate the test status, accounting for the updated state if the hook errored
+        // to see if we should continue running the test.
+        const status = test.calculateTestStatus()
+
+        // If we have remaining attempts, inclusive of the beforeEach attempt if it failed, then the hook is retry-able
+        isBeforeEachThatIsRetryable = isBeforeEachHook && status.shouldAttemptsContinue
+
+        if (isAfterEachHook) {
+          // If we have remaining attempts, inclusive of the afterEach attempt if it failed, then the hook is retry-able
+          if (status.shouldAttemptsContinue) {
+            isAfterEachThatIsRetryable = true
+          } else if (!status.shouldAttemptsContinue && err) {
+            /**
+             * OR in the event the test attempt 'passed' and hit the exit condition,
+             * BUT the afterEach hook errored which MIGHT change the test exit condition (as the test attempt is now 'failed')
+             *
+             * In this case, we need to see if we MIGHT have additional retries (maxRetries) available to reapply to satisfy
+             * the test exit condition.
+             *
+             * Ex: This is important for 'detect-flake-but-always-fail' where stopIfAnyPassed=true, where the test itself might pass,
+             * the exit condition is met, but THEN the 'afterEach' hook itself fails, which MIGHT change the exit conditions of the test
+             * if there are remaining attempts that can be executed in order to satisfy the experimentalRetries configuration.
+             *
+             * To help with exit conditions on test skipping on repeated hook failures, test._retries
+             * is set to retries made inside our mocha patch (./driver/patches/mocha+7.0.1.dev.patch), assuming a retry is made.
+             * To show how many attempts are possible, we set '_maxRetries' to the total retries initially configured in order
+             * to reference here in the case we might need to 'reset'.
+             *
+             * When we fall into this scenario, we need to 'reset' the mocha '_retries' in order to continue attempts
+             * and requeue the test.
+             */
+
+            // Since this is the afterEach, we can assume the currentRetry has already run
+            const canMoreAttemptsBeApplied = test._currentRetry === test._retries && test._currentRetry < test._maxRetries
+
+            if (canMoreAttemptsBeApplied) {
+              // The test in fact did NOT fit the exit condition because the 'afterEach' changed the status of the test.
+              // Reset the retries to apply more attempts to possibly satisfy the test retry conditions.
+              test._retries = test._maxRetries
+              isAfterEachThatIsRetryable = true
+            }
+          }
+        }
+      }
+
+      const willRetry = isBeforeEachThatIsRetryable || isAfterEachThatIsRetryable
+
       const isTestConfigOverride = !fired(TEST_BEFORE_RUN_EVENT, test)
 
       const fail = function () {
@@ -1240,10 +1475,21 @@ export default {
         return
       }
 
+      if (isTest) {
+        // If there is no error on the test attempt, then the test attempt passed!
+        // set a custom property on the test obj, hasTestAttemptPassed,
+        // to inform mocha (through patch-package) that we need to re-attempt a passed test attempt
+        // if experimentalRetries is enabled and there is at least one existing failure.
+        runnable.hasAttemptPassed = !err
+      }
+
       if (err) {
         if (willRetry) {
-          test.state = 'failed'
           test.final = false
+          // If the test is being retried/re-attempted, delete the testStatusInfo metadata object if it is present
+          // that determines outer status as it is no longer needed and contributes to additional properties on the
+          // test runnable that are NOT needed.
+          delete test._cypressTestStatusInfo
         }
 
         if (isTestConfigOverride) {
@@ -1280,7 +1526,13 @@ export default {
 
           newTest._currentRetry = test._currentRetry + 1
 
-          test.parent.testsQueue.unshift(newTest)
+          // Check to see if the test attempt maybe passed, but hasn't satisfied its retry config yet and requeued itself.
+          // In this case, we DON'T need to add the new test attempt as it is already queued to rerun.
+          const testRetryThatMatches = test.parent.testsQueue.find((t) => t.id === newTest.id && t._currentRetry === newTest._currentRetry)
+
+          if (!testRetryThatMatches) {
+            test.parent.testsQueue.unshift(newTest)
+          }
 
           // this prevents afterEach hooks that exist at a deeper (or same) level than the failing one from running
           test._skipHooksWithLevelGreaterThan = runnable.titlePath().length - 1
@@ -1314,7 +1566,7 @@ export default {
       onSpecError,
       setOnlyTestId,
       setOnlySuiteId,
-      normalizeAll (tests, skipCollectingLogs) {
+      normalizeAll (tests, skipCollectingLogs, testFilter) {
         _skipCollectingLogs = skipCollectingLogs
         // if we have an uncaught error then slice out
         // all of the tests and suites and just generate
@@ -1334,6 +1586,7 @@ export default {
         return normalizeAll(
           _runner.suite,
           tests,
+          testFilter,
           setTestsById,
           setTests,
           getRunnableId,
@@ -1492,7 +1745,7 @@ export default {
           // attach error right now
           // if we have one
           if (err) {
-            const PendingErrorMessages = ['sync skip', 'async skip call', 'async skip; aborting execution']
+            const PendingErrorMessages = ['sync skip', 'sync skip; aborting execution', 'async skip call', 'async skip; aborting execution']
 
             if (_.find(PendingErrorMessages, err.message) !== undefined) {
               err.isPending = true
@@ -1506,7 +1759,7 @@ export default {
             delete runnable.err
           }
 
-          err = maybeHandleRetry(runnable, err)
+          err = maybeHandleRetryOnFailure(runnable, err)
 
           return runnableAfterRunAsync(runnable, Cypress)
           .then(() => {
@@ -1673,6 +1926,7 @@ export default {
       },
 
       getDisplayPropsForLog: LogUtils.getDisplayProps,
+      getProtocolPropsForLog: LogUtils.getProtocolProps,
 
       getConsolePropsForLog (testId, logId) {
         if (_skipCollectingLogs) return

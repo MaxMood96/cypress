@@ -53,13 +53,36 @@ describe('src/cypress/dom/visibility', () => {
       expect(fn()).to.be.true
     })
 
-    it('returns false window and body > window height', () => {
+    it('returns false if window and body < window height', () => {
       cy.$$('body').html('<div>foo</div>')
 
       const win = cy.state('window')
 
       const fn = () => {
         return dom.isScrollable(win)
+      }
+
+      expect(fn()).to.be.false
+    })
+
+    it('returns true if document element and body > window height', function () {
+      this.add('<div style="height: 1000px; width: 10px;" />')
+      const documentElement = Cypress.dom.wrap(cy.state('document').documentElement)
+
+      const fn = () => {
+        return dom.isScrollable(documentElement)
+      }
+
+      expect(fn()).to.be.true
+    })
+
+    it('returns false if document element and body < window height', () => {
+      cy.$$('body').html('<div>foo</div>')
+
+      const documentElement = Cypress.dom.wrap(cy.state('document').documentElement)
+
+      const fn = () => {
+        return dom.isScrollable(documentElement)
       }
 
       expect(fn()).to.be.false
@@ -223,9 +246,7 @@ describe('src/cypress/dom/visibility', () => {
 
       this.$parentNoWidth = add(`\
 <div style='width: 0; height: 100px; overflow: hidden;'>
-  <div style='height: 500px; width: 500px;'>
     <span>parent width: 0</span>
-  </div>
 </div>`)
 
       this.$parentNoHeight = add(`\
@@ -240,10 +261,27 @@ describe('src/cypress/dom/visibility', () => {
 
       this.$parentWithWidthHeightNoOverflow = add(`\
 <div style='width: 100px; height: 100px; overflow: hidden;'>
-  <div style='height: 100px; width: 100px;'>
     <span>parent with size, overflow: hidden</span>
-  </div>
 </div>`)
+
+      this.$ancestorWithWidthHeightNoOverflow = add(`\
+      <div style='width: 100px; height: 100px'>
+          <div><span>parent with size, overflow: hidden</span></div>
+      </div>`)
+
+      this.$ancestorNoWidth = add(`\
+      <div style='width: 0; height: 100px; overflow: hidden;'>
+        <div>
+          <span>ancestor width: 0</span>
+        </div>
+      </div>`)
+
+      this.$ancestorNoHeight = add(`\
+      <div style='width: 100px; height: 0px; overflow: hidden;'>
+        <div>
+          <span>ancestor height: 0</span>
+        </div>
+      </div>`)
 
       this.$childPosAbs = add(`\
 <div style='width: 0; height: 100px; overflow: hidden;'>
@@ -333,25 +371,25 @@ describe('src/cypress/dom/visibility', () => {
 
       this.$elOutOfParentBoundsToLeft = add(`\
 <div style='width: 100px; height: 100px; overflow: hidden; position: relative;'>
-  <span style='position: absolute; left: -400px; top: 0px;'>position: absolute, out of bounds left</span>
+  <span style='position: absolute; width: 100px; height: 100px; left: -100px; top: 0px;'>position: absolute, out of bounds left</span>
 </div>\
 `)
 
       this.$elOutOfParentBoundsToRight = add(`\
 <div id="elOutOfParentBoundsToRight" style='width: 100px; height: 100px; overflow: hidden; position: relative;'>
-  <span style='position: absolute; left: 200px; top: 0px;'>position: absolute, out of bounds right</span>
+  <span style='position: absolute; width: 100px; height: 100px; right: -100px; top: 0px;'>position: absolute, out of bounds right</span>
 </div>\
 `)
 
       this.$elOutOfParentBoundsAbove = add(`\
 <div style='width: 100px; height: 100px; overflow: hidden; position: relative;'>
-  <span style='position: absolute; left: 0px; top: -100px;'>position: absolute, out of bounds above</span>
+  <span style='position: absolute; width: 100px; height: 100px; left: 0px; top: -100px;'>position: absolute, out of bounds above</span>
 </div>\
 `)
 
       this.$elOutOfParentBoundsBelow = add(`\
 <div id="elOutOfParentBoundsBelow" style='width: 100px; height: 100px; overflow: hidden; position: relative;'>
-  <span style='position: absolute; left: 0px; top: 200px;'>position: absolute, out of bounds below</span>
+  <span style='position: absolute; width: 100px; height: 100px; left: 0px; bottom: -100px;'>position: absolute, out of bounds below</span>
 </div>\
 `)
 
@@ -719,9 +757,24 @@ describe('src/cypress/dom/visibility', () => {
         expect(this.$parentNoHeight.find('span')).to.not.be.visible
       })
 
+      it('is hidden if ancestor has overflow:hidden and no width', function () {
+        expect(this.$ancestorNoWidth.find('span')).to.be.hidden
+        expect(this.$ancestorNoWidth.find('span')).to.not.be.visible
+      })
+
+      it('is hidden if ancestor has overflow:hidden and no height', function () {
+        expect(this.$ancestorNoHeight.find('span')).to.be.hidden
+        expect(this.$ancestorNoHeight.find('span')).to.not.be.visible
+      })
+
       it('is visible when parent has positive dimensions even with overflow hidden', function () {
         expect(this.$parentWithWidthHeightNoOverflow.find('span')).to.be.visible
         expect(this.$parentWithWidthHeightNoOverflow.find('span')).to.not.be.hidden
+      })
+
+      it('is visible when ancestor has positive dimensions even with overflow hidden', function () {
+        expect(this.$ancestorWithWidthHeightNoOverflow.find('span')).to.be.visible
+        expect(this.$ancestorWithWidthHeightNoOverflow.find('span')).to.not.be.hidden
       })
     })
 
@@ -796,10 +849,9 @@ describe('src/cypress/dom/visibility', () => {
     })
 
     describe('css overflow', () => {
-      it('is visible when parent doesnt have overflow hidden', function () {
-        expect(this.$parentNoWidthHeightOverflowAuto.find('span')).to.be.visible
-
-        expect(this.$parentNoWidthHeightOverflowAuto.find('span')).to.not.be.hidden
+      it('is hidden when parent overflow auto and no width/height', function () {
+        expect(this.$parentNoWidthHeightOverflowAuto.find('span')).to.not.be.visible
+        expect(this.$parentNoWidthHeightOverflowAuto.find('span')).to.be.hidden
       })
 
       it('is hidden when parent overflow hidden and out of bounds to left', function () {
@@ -874,7 +926,7 @@ describe('src/cypress/dom/visibility', () => {
     })
 
     describe('css clip-path', () => {
-      // TODO: why is this skipped?
+      // TODO: handle clip path 'hidden' equivalents
       it.skip('is hidden when outside of parents clip-path', function () {
         expect(this.$parentWithClipPathAbsolutePositionElOutsideClipPath.find('span')).to.be.hidden
       })

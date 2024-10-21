@@ -8,7 +8,7 @@
   >
     <template #target="{open}">
       <ListRowHeader
-        :class="{ 'rounded-b-none mb-0.1em default-ring': open, 'overflow-hidden': !open }"
+        :class="{ 'rounded-b-none mb-[0.1em] default-ring': open, 'overflow-hidden': !open }"
         class="border hocus-default cursor-pointer font-medium"
         :description="description"
         :icon="statusInfo.icon"
@@ -25,7 +25,7 @@
         <template #right>
           <i-cy-chevron-down
             :class="{ 'rotate-180': open }"
-            class="max-w-16px transform icon-dark-gray-400"
+            class="max-w-[16px] transform icon-dark-gray-400"
           />
         </template>
       </ListRowHeader>
@@ -34,7 +34,7 @@
       v-if="status === 'changes'"
       class="border-b flex bg-warning-100 border-b-gray-100 p-3 top-0 text-warning-600 z-1 sticky items-center"
     >
-      <p class="flex-grow text-left ml-1">
+      <p class="grow text-left ml-1">
         <span class="font-semibold">{{ t('setupPage.configFile.changesRequiredLabel') }}: </span>
         <i18n-t
           scope="global"
@@ -45,7 +45,8 @@
       </p>
       <Button
         class="whitespace-nowrap"
-        href="https://on.cypress.io/guides/configuration"
+        size="32"
+        @click="openLearnMoreExternalLink"
       >
         {{ t('links.learnMoreButton') }}
       </Button>
@@ -60,8 +61,8 @@
 </template>
 
 <script lang="ts">
-import type { BadgeRowStatus } from '@cy/components/Badge.vue'
 import type { FunctionalComponent, SVGAttributes, ComputedRef } from 'vue'
+import type { BadgeRowStatus } from '@cy/components/Badge.vue'
 
 export type FileRowStatus = 'changes' | 'valid' | 'skipped' | 'error';
 
@@ -74,10 +75,9 @@ export type StatusInfo = {
 </script>
 
 <script lang="ts" setup>
-// eslint-disable-next-line no-duplicate-imports
 import { computed } from 'vue'
-import Button from '@cy/components/Button.vue'
-// eslint-disable-next-line no-duplicate-imports
+import Button from '@cypress-design/vue-button'
+import { useExternalLink } from '@cy/gql-components/useExternalLink'
 import Badge from '@cy/components/Badge.vue'
 import { useI18n } from '@cy/i18n'
 import ShikiHighlight from '@cy/components/ShikiHighlight.vue'
@@ -88,6 +88,8 @@ import SkippedIcon from '~icons/cy/file-changes-skipped_x24.svg'
 import ErrorIcon from '~icons/cy/file-changes-error_x24.svg'
 import WarningIcon from '~icons/cy/file-changes-warning_x24.svg'
 
+const LEARN_MORE_URL = 'https://on.cypress.io/guides/configuration'
+
 const { t } = useI18n()
 
 const props = defineProps<{
@@ -97,6 +99,8 @@ const props = defineProps<{
   description?: string
   fileExtension: string
 }>()
+
+const openLearnMoreExternalLink = useExternalLink(LEARN_MORE_URL)
 
 const language = computed(() => {
   // The fileExtension from FileParts is prepended with a period;

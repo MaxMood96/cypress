@@ -1,3 +1,38 @@
+# [@cypress/vue-v6.0.1](https://github.com/cypress-io/cypress/compare/@cypress/vue-v6.0.0...@cypress/vue-v6.0.1) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+# [@cypress/vue-v6.0.0](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.5...@cypress/vue-v6.0.0) (2023-08-29)
+
+
+* `@cypress/vue-v6.0.0` was inadvertently released and published. There are no breaking changes or any other changes in this release.
+
+# [@cypress/vue-v5.0.5](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.4...@cypress/vue-v5.0.5) (2023-03-20)
+
+
+### Bug Fixes
+
+* **vite-dev-server:** do not use incremental esbuild option with Vite v4.2.0+ ([#26139](https://github.com/cypress-io/cypress/issues/26139)) ([3a2b2d3](https://github.com/cypress-io/cypress/commit/3a2b2d3323310c68f72f6e42203f5e93afc1cde5))
+
+# [@cypress/vue-v5.0.4](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.3...@cypress/vue-v5.0.4) (2023-02-06)
+
+# [@cypress/vue-v5.0.3](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.2...@cypress/vue-v5.0.3) (2022-12-02)
+
+
+### Bug Fixes
+
+* remove cypress.server.defaults, cy.server and cy.route ([#24411](https://github.com/cypress-io/cypress/issues/24411)) ([2f18a8c](https://github.com/cypress-io/cypress/commit/2f18a8cbd2d1a90fe1f77a29cdc89571bf54109e))
+
+# [@cypress/vue-v5.0.2](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.1...@cypress/vue-v5.0.2) (2022-11-23)
+
+
+### Bug Fixes
+
+* fix windows-lint CI job ([#24758](https://github.com/cypress-io/cypress/issues/24758)) ([2166ba0](https://github.com/cypress-io/cypress/commit/2166ba0d9496037df843d55f07517f83817171a3))
+
 # [@cypress/vue-v5.0.1](https://github.com/cypress-io/cypress/compare/@cypress/vue-v5.0.0...@cypress/vue-v5.0.1) (2022-11-08)
 
 
