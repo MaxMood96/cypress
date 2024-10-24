@@ -48,16 +48,12 @@ export class AutIframe {
     this.$iframe.remove()
   }
 
-  showInitialBlankContents () {
+  _showInitialBlankPage () {
     this._showContents(blankContents.initial())
   }
 
-  showSessionBlankContents () {
-    this._showContents(blankContents.session())
-  }
-
-  showSessionLifecycleBlankContents () {
-    this._showContents(blankContents.sessionLifecycle())
+  _showTestIsolationBlankPage () {
+    this._showContents(blankContents.testIsolationBlankPage())
   }
 
   showVisitFailure = (props) => {
@@ -126,7 +122,7 @@ export class AutIframe {
     this.$iframe?.removeAttr('src')
   }
 
-  visitBlank = ({ type }: { type?: 'session' | 'session-lifecycle' }) => {
+  visitBlankPage = (testIsolation?: boolean) => {
     return new Promise<void>((resolve) => {
       if (!this.$iframe) {
         return
@@ -135,15 +131,10 @@ export class AutIframe {
       this.$iframe[0].src = 'about:blank'
 
       this.$iframe.one('load', () => {
-        switch (type) {
-          case 'session':
-            this.showSessionBlankContents()
-            break
-          case 'session-lifecycle':
-            this.showSessionLifecycleBlankContents()
-            break
-          default:
-            this.showInitialBlankContents()
+        if (testIsolation) {
+          this._showTestIsolationBlankPage()
+        } else {
+          this._showInitialBlankPage()
         }
 
         resolve()
@@ -479,15 +470,21 @@ export class AutIframe {
 
     if (!$el) {
       return logger.logFormatted({
-        Command: selectorPlaygroundStore.command,
-        Yielded: 'Nothing',
+        name: selectorPlaygroundStore.command,
+        type: 'command',
+        props: {
+          Yielded: 'Nothing',
+        },
       })
     }
 
     logger.logFormatted({
-      Command: selectorPlaygroundStore.command,
-      Elements: $el.length,
-      Yielded: Cypress.dom.getElements($el),
+      name: selectorPlaygroundStore.command,
+      type: 'command',
+      props: {
+        Elements: $el.length,
+        Yielded: Cypress.dom.getElements($el),
+      },
     })
   }
 

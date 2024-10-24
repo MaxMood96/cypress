@@ -56,7 +56,7 @@ module.exports = {
 
     const options = {
       preferLocal: true, // finds the "node_modules/.bin/electron"
-      timeout: 5000, // prevents hanging Electron if there is an error for some reason
+      timeout: 10000, // prevents hanging Electron if there is an error for some reason
     }
 
     debug('Running Electron with %o %o', args, options)
@@ -126,7 +126,11 @@ module.exports = {
         const opts = minimist(argv)
 
         if (opts.inspectBrk) {
-          argv.unshift('--inspect-brk=5566')
+          if (process.env.CYPRESS_DOCKER_DEV_INSPECT_OVERRIDE) {
+            argv.unshift(`--inspect-brk=${process.env.CYPRESS_DOCKER_DEV_INSPECT_OVERRIDE}`)
+          } else {
+            argv.unshift('--inspect-brk=5566')
+          }
         }
       }
 

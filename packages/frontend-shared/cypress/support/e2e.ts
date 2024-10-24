@@ -1,5 +1,5 @@
 import '@testing-library/cypress/add-commands'
-import { browsers } from '@packages/launcher/lib/browsers'
+import { knownBrowsers } from '@packages/launcher/lib/known-browsers'
 import { configure } from '@testing-library/cypress'
 import { fixtureDirs, ProjectFixtureDir } from '@tooling/system-tests'
 import type { DataContext } from '@packages/data-context'
@@ -17,6 +17,8 @@ import type { E2ETaskMap } from '../e2e/e2ePluginSetup'
 import { installCustomPercyCommand } from './customPercyCommand'
 import i18n from '../../src/locales/en-US.json'
 import { addNetworkCommands } from './onlineNetwork'
+import { logInternal } from './utils'
+import { tabUntil } from './tab-until'
 
 configure({ testIdAttribute: 'data-cy' })
 
@@ -51,7 +53,18 @@ export interface RemoteGraphQLInterceptPayload {
   Response: typeof Response
 }
 
-export type RemoteGraphQLInterceptor = (obj: RemoteGraphQLInterceptPayload, testState: Record<string, any>) => ExecutionResult | Promise<ExecutionResult> | Response
+export interface RemoteGraphQLBatchInterceptPayload<T> {
+  key: string
+  index: number
+  field: string
+  variables: Record<string, any>
+  result: T
+}
+
+export type RemoteGraphQLInterceptor <T = {[key: string]: any}> = (
+  obj: RemoteGraphQLInterceptPayload, testState: Record<string, any>, options: Record<string, any>) => ExecutionResult<T> | Promise<ExecutionResult<T>> | Response
+
+export type RemoteGraphQLBatchInterceptor<T = any> = (obj: RemoteGraphQLBatchInterceptPayload<T>, testState: Record<string, any>) => T | Promise<T>
 
 export interface FindBrowsersOptions {
   // Array of FoundBrowser objects that will be used as the mock output
@@ -134,6 +147,10 @@ declare global {
        */
       remoteGraphQLIntercept: typeof remoteGraphQLIntercept
       /**
+       * Gives the ability to intercept the batched remote GraphQL request & respond accordingly
+       */
+      remoteGraphQLInterceptBatched: typeof remoteGraphQLInterceptBatched
+      /**
        * Removes the sinon spy'ing on the remote GraphQL fake requests
        */
       disableRemoteGraphQLFakes(): void
@@ -142,9 +159,13 @@ declare global {
        */
       visitApp(href?: string, opts?: Partial<Cypress.VisitOptions>): Chainable<AUTWindow>
       /**
+       * Verifies the specs page is visible (list, no specs, or create spec page)
+       */
+      specsPageIsVisible(specsSetup?: 'new-project' | 'no-specs'): Chainable<any>
+      /**
        * Visits the Cypress launchpad
        */
-      visitLaunchpad(href?: string): Chainable<AUTWindow>
+      visitLaunchpad: typeof visitLaunchpad
       /**
        * Skips the welcome screen of the launchpad
        */
@@ -158,10 +179,6 @@ declare global {
        * and asserts that it triggers the appropriate mutation when clicked.
        */
       validateExternalLink(options: ValidateExternalLinkOptions | string): Chainable<JQuery<HTMLElement>>
-      /**
-       * Tabs until the result of fn is true
-       */
-      tabUntil(fn: ($el: JQuery) => boolean, limit?: number): Chainable<any>
       /**
        * Get the AUT <iframe>. Useful for Cypress in Cypress tests.
        */
@@ -222,8 +239,10 @@ function openGlobalMode (options: OpenGlobalModeOptions = {}) {
   })
 }
 
-function openProject (projectName: ProjectFixtureDir, argv: string[] = []) {
-  if (!fixtureDirs.includes(projectName)) {
+type WithPrefix<T extends string> = `${T}${string}`;
+
+function openProject (projectName: WithPrefix<ProjectFixtureDir>, argv: string[] = []) {
+  if (!fixtureDirs.some((dir) => projectName.startsWith(dir))) {
     throw new Error(`Unknown project ${projectName}`)
   }
 
@@ -319,7 +338,7 @@ function startAppServer (mode: 'component' | 'e2e' = 'e2e', options: { skipMocki
           })
         }
 
-        return ctx.appServerPort
+        return ctx.coreData.servers.appServerPort
       }, { log: false, mode, url: win.top ? win.top.location.href : undefined, ...options }).then((serverPort) => {
         log?.set({ message: `port: ${serverPort}` })
         Cypress.env('e2e_serverPort', serverPort)
@@ -350,13 +369,47 @@ function visitApp (href?: string, opts?: Partial<Cypress.VisitOptions>) {
   })
 }
 
-function visitLaunchpad () {
-  return logInternal(`visitLaunchpad ${Cypress.env('e2e_launchpadPort')}`, () => {
+function specsPageIsVisible (specsSetup) {
+  if (specsSetup === 'new-project') {
+    // if this is a new project, we'll be on the create spec page
+    return cy.get('[data-cy=create-spec-page-cards]').should('be.visible')
+  }
+
+  if (specsSetup === 'no-specs') {
+    // if this is an existing project with no specs, we'll be on the no specs found page
+    return cy.get('[data-cy=create-spec-page-description]').should('be.visible')
+  }
+
+  // if our tests seeded specs, we'll be on the specs list page
+  return cy.get('[data-cy=spec-list-container]').should('be.visible')
+}
+
+function visitLaunchpad (options: { showWelcome?: boolean } = { showWelcome: false }) {
+  function launchpadVisit () {
     return cy.visit(`/__launchpad/index.html`, { log: false }).then((val) => {
       return cy.get('[data-e2e]', { timeout: 10000, log: false }).then(() => {
-        return val
+        return cy.get('.spinner', { timeout: 10000, log: false }).should('not.exist').then(() => {
+          return val
+        })
       })
     })
+  }
+
+  return logInternal(`visitLaunchpad ${Cypress.env('e2e_launchpadPort')}`, () => {
+    if (!options.showWelcome) {
+      return cy.withCtx(async (ctx, o) => {
+        // avoid re-stubbing already stubbed prompts in case we call getPreferences multiple times
+        if ((ctx._apis.localSettingsApi.getPreferences as any).wrappedMethod === undefined) {
+          o.sinon.stub(ctx._apis.localSettingsApi, 'getPreferences').resolves({ majorVersionWelcomeDismissed: {
+            [13]: Date.now(),
+          } })
+        }
+      }).then(() => {
+        return launchpadVisit()
+      })
+    }
+
+    return launchpadVisit()
   })
 }
 
@@ -446,7 +499,7 @@ function findBrowsers (options: FindBrowsersOptions = {}) {
       return result
     }
 
-    filteredBrowsers = [...browsers, {
+    filteredBrowsers = [...knownBrowsers, {
       name: 'electron',
       channel: 'stable',
       family: 'chromium',
@@ -461,9 +514,18 @@ function findBrowsers (options: FindBrowsersOptions = {}) {
   })
 }
 
-function remoteGraphQLIntercept (fn: RemoteGraphQLInterceptor) {
+function remoteGraphQLIntercept <T = any> (fn: RemoteGraphQLInterceptor<T>, remoteGraphQLOptions?: Record<string, any>) {
   return logInternal('remoteGraphQLIntercept', () => {
-    return taskInternal('__internal_remoteGraphQLIntercept', fn.toString())
+    return taskInternal('__internal_remoteGraphQLIntercept', {
+      fn: fn.toString(),
+      remoteGraphQLOptions,
+    })
+  })
+}
+
+function remoteGraphQLInterceptBatched <T = any> (fn: RemoteGraphQLBatchInterceptor<T>) {
+  return logInternal('remoteGraphQLInterceptBatched', () => {
+    return taskInternal('__internal_remoteGraphQLInterceptBatched', fn.toString())
   })
 }
 
@@ -477,18 +539,6 @@ function taskInternal<T extends keyof E2ETaskMap> (name: T, arg: Parameters<E2ET
   const isDebugging = Boolean(Cypress.env('e2e_isDebugging'))
 
   return cy.task<Resolved<ReturnType<E2ETaskMap[T]>>>(name, arg, { log: isDebugging, timeout: options.timeout ?? (isDebugging ? NO_TIMEOUT : TEN_SECONDS) })
-}
-
-function logInternal<T> (name: string | Partial<Cypress.LogConfig>, cb: (log: Cypress.Log | undefined) => Cypress.Chainable<T>, opts: Partial<Cypress.Loggable> = {}): Cypress.Chainable<T> {
-  const _log = typeof name === 'string'
-    ? Cypress.log({ name, message: '' })
-    : Cypress.log(name)
-
-  return cb(_log).then<T>((val) => {
-    _log?.end()
-
-    return val
-  })
 }
 
 /**
@@ -520,35 +570,11 @@ function validateExternalLink (subject, options: ValidateExternalLinkOptions | s
   })
 }
 
-function tabUntil (fn: (el: JQuery<HTMLElement>) => boolean, limit: number = 10) {
-  function _tabUntil (step: number) {
-    return cy.tab().focused({ log: false }).then((el) => {
-      const pass = fn(el)
-
-      if (pass) {
-        return el
-      }
-
-      if (step > limit) {
-        throw new Error(`Unable to step to element in ${fn.toString()} in ${limit} steps`)
-      }
-
-      return _tabUntil(step + 1)
-    })
-  }
-
-  return logInternal('tabUntil', () => {
-    cy.get('body')
-
-    return _tabUntil(0)
-  })
-}
-
 function getAutIframe () {
   return cy.get('iframe.aut-iframe').its('0.contentDocument.documentElement').then(cy.wrap) as Cypress.Chainable<JQuery<HTMLIFrameElement>>
 }
 
-Cypress.on('uncaught:exception', (err) => !err.message.includes('ResizeObserver loop limit exceeded'))
+Cypress.on('uncaught:exception', (err) => !err.message.includes('ResizeObserver loop completed with undelivered notifications.'))
 
 Cypress.Commands.add('scaffoldProject', scaffoldProject)
 
@@ -556,6 +582,7 @@ Cypress.Commands.add('getAutIframe', getAutIframe)
 Cypress.Commands.add('addProject', addProject)
 Cypress.Commands.add('openGlobalMode', openGlobalMode)
 Cypress.Commands.add('visitApp', visitApp)
+Cypress.Commands.add('specsPageIsVisible', specsPageIsVisible)
 Cypress.Commands.add('loginUser', loginUser)
 Cypress.Commands.add('visitLaunchpad', visitLaunchpad)
 Cypress.Commands.add('skipWelcome', skipWelcome)
@@ -564,15 +591,13 @@ Cypress.Commands.add('openProject', openProject)
 Cypress.Commands.add('withCtx', withCtx)
 Cypress.Commands.add('withRetryableCtx', withRetryableCtx)
 Cypress.Commands.add('remoteGraphQLIntercept', remoteGraphQLIntercept)
+Cypress.Commands.add('remoteGraphQLInterceptBatched', remoteGraphQLInterceptBatched)
 Cypress.Commands.add('findBrowsers', findBrowsers)
 Cypress.Commands.add('tabUntil', tabUntil)
 Cypress.Commands.add('validateExternalLink', { prevSubject: ['optional', 'element'] }, validateExternalLink)
 
 installCustomPercyCommand({
   elementOverrides: {
-    '[data-cy=top-nav-cypress-version-current-link]': ($el) => {
-      $el.attr('style', 'display: none !important') // TODO: display and set dummy text to vX.X.X once flake is fixed. See issue https://github.com/cypress-io/cypress/issues/21897
-    },
     '.runnable-header .duration': ($el) => {
       $el.text('XX:XX')
     },

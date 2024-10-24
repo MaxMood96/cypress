@@ -17,6 +17,8 @@ export function makeCypressWebpackConfig (
   const {
     devServerConfig: {
       cypressConfig: {
+        experimentalJustInTimeCompile,
+        port,
         projectRoot,
         devServerPublicPathRoute,
         supportFile,
@@ -42,6 +44,8 @@ export function makeCypressWebpackConfig (
       },
     },
   } = config
+
+  const webpackDevServerPort = port ?? undefined
 
   debug(`Using HtmlWebpackPlugin version ${htmlWebpackPluginVersion} from ${htmlWebpackPluginImportPath}`)
 
@@ -78,7 +82,7 @@ export function makeCypressWebpackConfig (
     },
     plugins: [
       new (HtmlWebpackPlugin as typeof import('html-webpack-plugin-5'))({
-        template: indexHtmlFile,
+        template: indexHtmlFile ? path.isAbsolute(indexHtmlFile) ? indexHtmlFile : path.join(projectRoot, indexHtmlFile) : undefined,
         // Angular generates all of it's scripts with <script type="module">. Live-reloading breaks without this option.
         // We need to manually set the base here to `/__cypress/src/` so that static assets load with our proxy
         ...(framework === 'angular' ? { scriptLoading: 'module', base: '/__cypress/src/' } : {}),
@@ -89,15 +93,31 @@ export function makeCypressWebpackConfig (
         devServerEvents,
         supportFile,
         webpack,
+        indexHtmlFile,
       }),
     ],
     devtool: 'inline-source-map',
   } as any
 
   if (isRunMode) {
+    // if experimentalJustInTimeCompile is configured, we need to watch for file changes as the spec entries are going to be updated per test
+    const ignored = experimentalJustInTimeCompile ? /node_modules/ : '**/*'
+
     // Disable file watching when executing tests in `run` mode
     finalConfig.watchOptions = {
-      ignored: '**/*',
+      ignored,
+    }
+  }
+
+  if (webpackDevServerMajorVersion === 5) {
+    return {
+      ...finalConfig,
+      devServer: {
+        port: webpackDevServerPort,
+        client: {
+          overlay: false,
+        },
+      },
     }
   }
 
@@ -105,6 +125,7 @@ export function makeCypressWebpackConfig (
     return {
       ...finalConfig,
       devServer: {
+        port: webpackDevServerPort,
         client: {
           overlay: false,
         },
@@ -116,6 +137,7 @@ export function makeCypressWebpackConfig (
   return {
     ...finalConfig,
     devServer: {
+      port: webpackDevServerPort,
       overlay: false,
     },
   }

@@ -1,7 +1,7 @@
 /* eslint-disable no-dupe-class-members */
 import { CypressError, getError } from '@packages/errors'
 import type { FullConfig, TestingType } from '@packages/types'
-import { ChildProcess, fork, ForkOptions } from 'child_process'
+import { ChildProcess, fork, ForkOptions, spawn } from 'child_process'
 import EventEmitter from 'events'
 import fs from 'fs-extra'
 import path from 'path'
@@ -10,6 +10,10 @@ import debugLib from 'debug'
 import { autoBindDebug, hasTypeScriptInstalled, toPosix } from '../util'
 import _ from 'lodash'
 import { pathToFileURL } from 'url'
+import os from 'os'
+import semver from 'semver'
+import type { OTLPTraceExporterCloud } from '@packages/telemetry'
+import { telemetry, encodeTelemetryContext } from '@packages/telemetry'
 
 const pkg = require('@packages/root')
 const debug = debugLib(`cypress:lifecycle:ProjectConfigIpc`)
@@ -20,6 +24,14 @@ const tsNodeEsm = pathToFileURL(require.resolve('ts-node/esm/transpile-only')).h
 const tsNode = toPosix(require.resolve('@packages/server/lib/plugins/child/register_ts_node'))
 
 export type IpcHandler = (ipc: ProjectConfigIpc) => void
+
+/**
+ * If running as root on Linux, no-sandbox must be passed or Chrome will not start
+ */
+const isSandboxNeeded = () => {
+  // eslint-disable-next-line no-restricted-properties
+  return (os.platform() === 'linux') && (process.geteuid && process.geteuid() === 0)
+}
 
 export interface SetupNodeEventsReply {
   setupConfig: Cypress.ConfigOptions | null
@@ -47,6 +59,7 @@ export class ProjectConfigIpc extends EventEmitter {
 
   constructor (
     readonly nodePath: string | undefined | null,
+    readonly nodeVersion: string | undefined | null,
     readonly projectRoot: string,
     readonly configFilePath: string,
     readonly configFile: string | false,
@@ -67,6 +80,14 @@ export class ProjectConfigIpc extends EventEmitter {
       this.emit('disconnect')
     })
 
+    // This forwards telemetry requests from the child process to the server
+    this.on('export:telemetry', (data) => {
+      // Not too worried about tracking successes
+      (telemetry.exporter() as OTLPTraceExporterCloud)?.send(data, () => {}, (err) => {
+        debug('error exporting telemetry data from child process %s', err)
+      })
+    })
+
     return autoBindDebug(this)
   }
 
@@ -78,6 +99,7 @@ export class ProjectConfigIpc extends EventEmitter {
   send(event: 'execute:plugins', evt: string, ids: {eventId: string, invocationId: string}, args: any[]): boolean
   send(event: 'setupTestingType', testingType: TestingType, options: Cypress.PluginConfigOptions): boolean
   send(event: 'loadConfig'): boolean
+  send(event: 'main:process:will:disconnect'): void
   send (event: string, ...args: any[]) {
     if (this._childProcess.killed || !this._childProcess.connected) {
       return false
@@ -87,7 +109,8 @@ export class ProjectConfigIpc extends EventEmitter {
   }
 
   on(evt: 'childProcess:unhandledError', listener: (err: CypressError) => void): this
-
+  on(evt: 'export:telemetry', listener: (data: string) => void): void
+  on(evt: 'main:process:will:disconnect:ack', listener: () => void): void
   on(evt: 'warning', listener: (warningErr: CypressError) => void): this
   on (evt: string, listener: (...args: any[]) => void) {
     return super.on(evt, listener)
@@ -119,7 +142,7 @@ export class ProjectConfigIpc extends EventEmitter {
   loadConfig (): Promise<LoadConfigReply> {
     return new Promise((resolve, reject) => {
       if (this._childProcess.stdout && this._childProcess.stderr) {
-        // manually pipe plugin stdout and stderr for dashboard capture
+        // manually pipe plugin stdout and stderr for Cypress Cloud capture
         // @see https://github.com/cypress-io/cypress/issues/7434
         this._childProcess.stdout.on('data', (data) => process.stdout.write(data))
         this._childProcess.stderr.on('data', (data) => process.stderr.write(data))
@@ -280,7 +303,15 @@ export class ProjectConfigIpc extends EventEmitter {
         // best option that leverages the existing modules we bundle in the binary.
         // @see ts-node esm loader https://typestrong.org/ts-node/docs/usage/#node-flags-and-other-tools
         // @see Node.js Loader API https://nodejs.org/api/esm.html#customizing-esm-specifier-resolution-algorithm
-        const tsNodeEsmLoader = `--experimental-specifier-resolution=node --loader ${tsNodeEsm}`
+        let tsNodeEsmLoader = `--experimental-specifier-resolution=node --loader ${tsNodeEsm}`
+
+        // in nodejs 22.7.0, the --experimental-detect-module option is now enabled by default.
+        // We need to disable it with the --no-experimental-detect-module flag.
+        // @see https://github.com/cypress-io/cypress/issues/30084
+        if (this.nodeVersion && semver.gte(this.nodeVersion, '22.7.0')) {
+          debug(`detected node version ${this.nodeVersion}, adding --no-experimental-detect-module option to child_process NODE_OPTIONS.`)
+          tsNodeEsmLoader = `${tsNodeEsmLoader} --no-experimental-detect-module`
+        }
 
         if (childOptions.env.NODE_OPTIONS) {
           childOptions.env.NODE_OPTIONS += ` ${tsNodeEsmLoader}`
@@ -308,6 +339,22 @@ export class ProjectConfigIpc extends EventEmitter {
       // Just use Node's built-in ESM support.
       // TODO: Consider using userland `esbuild` with Node's --loader API to handle ESM.
       debug(`no typescript found, just use regular Node.js`)
+    }
+
+    const telemetryCtx = encodeTelemetryContext({ context: telemetry.getActiveContextObject(), version: pkg.version })
+
+    // Pass the active context from the main process to the child process as the --telemetryCtx flag.
+    configProcessArgs.push('--telemetryCtx', telemetryCtx)
+
+    if (process.env.CYPRESS_INTERNAL_E2E_TESTING_SELF_PARENT_PROJECT) {
+      if (isSandboxNeeded()) {
+        configProcessArgs.push('--no-sandbox')
+      }
+
+      return spawn(process.execPath, ['--entryPoint', CHILD_PROCESS_FILE_PATH, ...configProcessArgs], {
+        ...childOptions,
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+      })
     }
 
     return fork(CHILD_PROCESS_FILE_PATH, configProcessArgs, childOptions)

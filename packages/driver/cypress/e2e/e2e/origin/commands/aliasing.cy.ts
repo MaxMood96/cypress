@@ -53,15 +53,16 @@ context('cy.origin aliasing', { browser: '!webkit' }, () => {
         // make sure $el is in fact a jquery instance to keep the logs happy
         expect($el.jquery).to.be.ok
 
-        expect(alias).to.equal('buttonAlias')
+        expect(alias).to.equal('@buttonAlias')
         expect(aliasType).to.equal('dom')
-        expect(consoleProps.Command).to.equal('get')
-        expect(consoleProps.Elements).to.equal(1)
-        expect(consoleProps.Selector).to.equal('#button')
+        expect(consoleProps.name).to.equal('get')
+        expect(consoleProps.type).to.equal('command')
+        expect(consoleProps.props.Elements).to.equal(1)
+        expect(consoleProps.props.Selector).to.equal('#button')
 
         // The Yielded value here SHOULD be correct as it will be reified from its props as it should not be found in the current DOM state
-        expect(consoleProps.Yielded.tagName).to.equal('BUTTON')
-        expect(consoleProps.Yielded.getAttribute('id')).to.equal('button')
+        expect(consoleProps.props.Yielded.tagName).to.equal('BUTTON')
+        expect(consoleProps.props.Yielded.getAttribute('id')).to.equal('button')
       })
     })
   })

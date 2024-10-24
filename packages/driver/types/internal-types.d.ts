@@ -46,6 +46,10 @@ declare namespace Cypress {
     (k: keyof ResolvedConfigOptions, v?: any): any
   }
 
+  interface TestConfigOverrides extends Cypress.TestConfigOverrides {
+    protocolEnabled?: boolean
+  }
+
   interface ResolvedConfigOptions {
     $autIframe: JQuery<HTMLIFrameElement>
     document: Document
@@ -53,16 +57,30 @@ declare namespace Cypress {
   }
 
   interface Actions {
-    (action: 'set:cookie', fn: (cookie: AutomationCookie) => void)
+    (action: 'set:cookie', fn: (cookie: SerializableAutomationCookie) => void)
     (action: 'clear:cookie', fn: (name: string) => void)
     (action: 'clear:cookies', fn: () => void)
-    (action: 'cross:origin:cookies', fn: (cookies: AutomationCookie[]) => void)
+    (action: 'cross:origin:cookies', fn: (cookies: SerializableAutomationCookie[]) => void)
     (action: 'before:stability:release', fn: () => void)
+    (action: '_log:added', fn: (attributes: ObjectLike, log: Cypress.Log) => void): Cypress
+    (action: '_log:changed', fn: (attributes: ObjectLike, log: Cypress.Log) => void): Cypress
     (action: 'paused', fn: (nextCommandName: string) => void)
   }
 
   interface Backend {
     (task: 'cross:origin:cookies:received'): Promise<void>
+    (task: 'get:rendered:html:origins'): Promise<string[]>
+  }
+}
+
+declare namespace InternalCypress {
+  interface Cypress extends Cypress.Cypress, NodeEventEmitter {
+    backend: (eventName: string, ...args: any[]) => Promise<any>
+  }
+
+  interface LocalStorage extends Cypress.LocalStorage {
+    setStorages: (local, remote) => LocalStorage
+    unsetStorages: () => LocalStorage
   }
 }
 
@@ -81,6 +99,16 @@ interface SpecWindow extends Window {
 interface CypressRunnable extends Mocha.Runnable {
   type: null | 'hook' | 'suite' | 'test'
   hookId: any
+  hookName: string
   id: any
   err: any
+  // Added by Cypress to Tests in order to calculate continue conditions for retries
+  calculateTestStatus?: () => {
+    strategy: 'detect-flake-and-pass-on-threshold' | 'detect-flake-but-always-fail' | undefined
+    shouldAttemptsContinue: boolean
+    attempts: number
+    outerStatus: 'passed' | failed
+  }
+  // Added by Cypress to Tests in order to determine if the experimentalRetries test run passed so we can leverage in the retry logic.
+  hasAttemptPassed?: boolean
 }

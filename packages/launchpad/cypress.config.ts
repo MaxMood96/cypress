@@ -6,6 +6,7 @@ export default defineConfig({
   projectId: 'ypt4pf',
   viewportWidth: 800,
   viewportHeight: 850,
+  experimentalMemoryManagement: true,
   retries: {
     runMode: 2,
     openMode: 0,
@@ -13,7 +14,6 @@ export default defineConfig({
   reporter: '../../node_modules/cypress-multi-reporters/index.js',
   reporterOptions: {
     configFile: '../../mocha-reporter-config.json',
-    videoCompression: false, // turn off video compression for CI
   },
   component: {
     experimentalSingleTabRunMode: true,
@@ -28,6 +28,7 @@ export default defineConfig({
     baseUrl: 'http://localhost:5555',
     supportFile: 'cypress/e2e/support/e2eSupport.ts',
     async setupNodeEvents (on, config) {
+      delete process.env.CYPRESS_INTERNAL_E2E_TESTING_SELF_PARENT_PROJECT
       process.env.CYPRESS_INTERNAL_E2E_TESTING_SELF = 'true'
       const { e2ePluginSetup } = require('@packages/frontend-shared/cypress/e2e/e2ePluginSetup')
 

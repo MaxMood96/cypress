@@ -2,13 +2,14 @@ import _ from 'lodash'
 import Debug from 'debug'
 import {
   defaultSpecPattern,
+  defaultExcludeSpecPattern,
   options,
   breakingOptions,
   breakingRootOptions,
   testingTypeBreakingOptions,
 } from './options'
 
-import type { TestingType } from '@packages/types'
+import type { BreakingErrResult, TestingType } from '@packages/types'
 import type { BreakingOption, BreakingOptionErrorKey, OverrideLevel } from './options'
 import type { ErrResult } from './validation'
 
@@ -17,6 +18,7 @@ import * as validation from './validation'
 
 export {
   defaultSpecPattern,
+  defaultExcludeSpecPattern,
   options,
   breakingOptions,
   BreakingOption,
@@ -56,14 +58,6 @@ const issuedWarnings = new Set()
 export type InvalidTestOverrideResult = {
   invalidConfigKey: string
   supportedOverrideLevel: string
-}
-
-export type BreakingErrResult = {
-  name: string
-  newName?: string
-  value?: any
-  configFile: string
-  testingType?: TestingType
 }
 
 type ErrorHandler = (
@@ -156,7 +150,7 @@ export const matchesConfigKey = (key: string) => {
 }
 
 export const validate = (cfg: any, onErr: (property: ErrResult | string) => void, testingType: TestingType | null) => {
-  debug('validating configuration')
+  debug('validating configuration', cfg)
 
   return _.each(cfg, (value, key) => {
     const validationFn = validationRules[key]
@@ -164,9 +158,9 @@ export const validate = (cfg: any, onErr: (property: ErrResult | string) => void
     // key has a validation rule & value different from the default
     if (validationFn && value !== defaultValues[key]) {
       const result = validationFn(key, value, {
-        testingType,
-        // TODO: remove with experimentalSessionAndOrigin. Fixed with: https://github.com/cypress-io/cypress/issues/21471
-        experimentalSessionAndOrigin: cfg.experimentalSessionAndOrigin,
+        // if we are validating the e2e or component-specific configuration values, pass
+        // the key testing type as the testing type to ensure correct validation
+        testingType: (key === 'e2e' || key === 'component') ? key : testingType,
       })
 
       if (result !== true) {
@@ -203,6 +197,26 @@ export const validateOverridableAtRunTime = (config: any, isSuiteLevelOverride: 
       return
     }
 
+    // this is unique validation, not applied to the general cy config.
+    // it will be removed when we support defining experimental retries
+    // in test config overrides
+
+    // TODO: remove when experimental retry overriding is supported
+
+    if (configKey === 'retries') {
+      const experimentalRetryCfgKeys = [
+        'experimentalStrategy', 'experimentalOptions',
+      ]
+
+      Object.keys(config.retries || {})
+      .filter((v) => experimentalRetryCfgKeys.includes(v))
+      .forEach((invalidExperimentalCfgOverride) => {
+        onErr({
+          invalidConfigKey: `retries.${invalidExperimentalCfgOverride}`,
+          supportedOverrideLevel: 'global_only',
+        })
+      })
+    }
     // TODO: add a hook to ensure valid testing-type configuration is being set at runtime for all configuration values.
     // https://github.com/cypress-io/cypress/issues/24365
 

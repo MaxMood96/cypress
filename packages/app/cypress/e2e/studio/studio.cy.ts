@@ -91,7 +91,6 @@ it('visits a basic html page', () => {
     })
 
     assertStudioHookCount(2)
-
     cy.getAutIframe().within(() => {
       cy.get('#increment').rightclick().then(() => {
         cy.get('.__cypress-studio-assertions-menu').shadow().contains('be visible').realClick()
@@ -138,19 +137,19 @@ it('visits a basic html page', () => {
       cy.get('.command-name-assert').should('have.length', 5)
 
       // (1) Assert Enabled
-      cy.get('.command-name-assert').should('contain.text', 'expect <button#increment> to be enabled')
+      cy.get('.command-name-assert').should('contain.text', 'expected <button#increment> to be enabled')
 
       // (2) Assert Visible
-      cy.get('.command-name-assert').should('contain.text', 'expect <button#increment> to be visible')
+      cy.get('.command-name-assert').should('contain.text', 'expected <button#increment> to be visible')
 
       // (3) Assert Text
-      cy.get('.command-name-assert').should('contain.text', 'expect <button#increment> to have text Increment')
+      cy.get('.command-name-assert').should('contain.text', 'expected <button#increment> to have text Increment')
 
       // (4) Assert Id
-      cy.get('.command-name-assert').should('contain.text', 'expect <button#increment> to have id increment')
+      cy.get('.command-name-assert').should('contain.text', 'expected <button#increment> to have id increment')
 
       // (5) Assert Attr
-      cy.get('.command-name-assert').should('contain.text', 'expect <button#increment> to have attr onclick with the value increment()')
+      cy.get('.command-name-assert').should('contain.text', 'expected <button#increment> to have attr onclick with the value increment()')
     })
 
     cy.get('button').contains('Save Commands').click()
@@ -232,6 +231,7 @@ it('visits a basic html page', () => {
     cy.openProject('experimental-studio')
     cy.startAppServer('e2e')
     cy.visitApp()
+    cy.specsPageIsVisible()
     cy.get(`[title="empty.cy.js"]`).should('be.visible').click()
 
     cy.waitForSpecToFinish()
@@ -254,5 +254,28 @@ it('visits a basic html page', () => {
     // If we hit "Continue" here, it updates the domain (as expected) but since we are
     // Cypress in Cypress, it redirects us the the spec page, which is not what normally
     // would happen in production.
+  })
+
+  it('shows menu and submenu correctly', () => {
+    launchStudio()
+
+    cy.getAutIframe().within(() => {
+      // Show menu
+      cy.get('h1').realClick({
+        button: 'right',
+      })
+
+      cy.get('.__cypress-studio-assertions-menu').shadow()
+      .find('.assertions-menu').should('be.visible')
+
+      // Show submenu
+      cy.get('.__cypress-studio-assertions-menu').shadow()
+      .find('.assertion-type-text:first').realHover()
+
+      cy.get('.__cypress-studio-assertions-menu').shadow()
+      .find('.assertion-option')
+      .should('have.text', 'Hello, Studio!')
+      .should('be.visible')
+    })
   })
 })

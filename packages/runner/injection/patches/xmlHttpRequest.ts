@@ -20,7 +20,7 @@ export const patchXmlHttpRequest = (window: Window) => {
   window.XMLHttpRequest.prototype.send = async function (...args) {
     try {
       // if the option is specified, communicate it to the the server to the proxy can make the request aware if it needs to potentially apply cross origin cookies
-      // if the option isn't set, we can imply the default as we know the resource type in the proxy
+      // if the option isn't set, we can imply the default as we know the "resourceType" in the proxy
       await requestSentWithCredentials({
         url: this._url,
         resourceType: 'xhr',

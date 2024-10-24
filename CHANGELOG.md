@@ -2,7 +2,7 @@
 
 - [Cypress App](https://on.cypress.io/changelog)
 - [`@cypress/angular`](https://github.com/cypress-io/cypress/blob/develop/npm/angular/CHANGELOG.md)
-- [`@cypress/create-cypress-tests`](https://github.com/cypress-io/cypress/blob/develop/npm/create-cypress-tests/CHANGELOG.md)
+- [`@cypress/angular-signals`](https://github.com/cypress-io/cypress/blob/develop/npm/angular-signals/CHANGELOG.md)
 - [`@cypress/eslint-plugin-dev`](https://github.com/cypress-io/cypress/blob/develop/npm/eslint-plugin-dev/CHANGELOG.md)
 - [`@cypress/mount-utils`](https://github.com/cypress-io/cypress/blob/develop/npm/mount-utils/CHANGELOG.md)
 - [`@cypress/react`](https://github.com/cypress-io/cypress/blob/develop/npm/react/CHANGELOG.md)
@@ -14,4 +14,3 @@
 - [`@cypress/webpack-batteries-included-preprocessor`](https://github.com/cypress-io/cypress/blob/develop/npm/webpack-batteries-included-preprocessor/CHANGELOG.md)
 - [`@cypress/webpack-dev-server`](https://github.com/cypress-io/cypress/blob/develop/npm/webpack-dev-server/CHANGELOG.md)
 - [`@cypress/webpack-preprocessor`](https://github.com/cypress-io/cypress/blob/develop/npm/webpack-preprocessor/CHANGELOG.md)
-- [`@cypress/xpath`](https://github.com/cypress-io/cypress/blob/develop/npm/xpath/CHANGELOG.md)

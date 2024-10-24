@@ -1,5 +1,8 @@
 const _ = require('lodash')
+const isCi = require('is-ci')
 const debug = require('debug')('cypress:server')
+
+const getIsCi = () => isCi
 
 const join = (char, ...pieces) => {
   return _.chain(pieces).compact().join(char).value()
@@ -110,7 +113,7 @@ const CI_PROVIDERS = {
   'travis': 'TRAVIS',
   'wercker': isWercker,
   netlify: 'NETLIFY',
-  layerci: 'LAYERCI',
+  webappio: 'WEBAPPIO',
 }
 
 const _detectProviderName = () => {
@@ -129,6 +132,15 @@ const _detectProviderName = () => {
   })
 }
 
+// User provided environment variables are used to allow users to define their own
+// values should the CI provider not have an existing or correct mapping from the list below.
+const _userProvidedProviderCiParams = () => {
+  return extract([
+    'CYPRESS_PULL_REQUEST_ID',
+    'CYPRESS_PULL_REQUEST_URL',
+    'CYPRESS_CI_BUILD_URL',
+  ])
+}
 // TODO: don't forget about buildNumber!
 // look at the old commit that was removed to see how we did it
 const _providerCiParams = () => {
@@ -142,11 +154,20 @@ const _providerCiParams = () => {
       'APPVEYOR_PULL_REQUEST_NUMBER',
       'APPVEYOR_PULL_REQUEST_HEAD_REPO_BRANCH',
     ]),
+    // https://learn.microsoft.com/en-us/azure/devops/pipelines/build/variables
     azure: extract([
       'BUILD_BUILDID',
       'BUILD_BUILDNUMBER',
       'BUILD_CONTAINERID',
       'BUILD_REPOSITORY_URI',
+      'SYSTEM_JOBID',
+      'SYSTEM_STAGEATTEMPT',
+      'SYSTEM_PHASEATTEMPT',
+      'SYSTEM_JOBATTEMPT',
+      'SYSTEM_PLANID',
+      'SYSTEM_PULLREQUEST_PULLREQUESTNUMBER',
+      'SYSTEM_PULLREQUEST_TARGETBRANCH',
+      'SYSTEM_PULLREQUEST_TARGETBRANCHNAME',
     ]),
     awsCodeBuild: extract([
       'CODEBUILD_BUILD_ID',
@@ -182,6 +203,7 @@ const _providerCiParams = () => {
       'BUILDKITE_PULL_REQUEST',
       'BUILDKITE_PULL_REQUEST_REPO',
       'BUILDKITE_PULL_REQUEST_BASE_BRANCH',
+      'BUILDKITE_RETRY_COUNT',
     ]),
     circle: extract([
       'CIRCLE_JOB',
@@ -192,6 +214,8 @@ const _providerCiParams = () => {
       'CIRCLE_PR_USERNAME',
       'CIRCLE_COMPARE_URL',
       'CIRCLE_WORKFLOW_ID',
+      'CIRCLE_WORKFLOW_JOB_ID',
+      'CIRCLE_PIPELINE_ID',
       'CIRCLE_PULL_REQUEST',
       'CIRCLE_REPOSITORY_URL',
       'CI_PULL_REQUEST',
@@ -210,6 +234,8 @@ const _providerCiParams = () => {
       'CI_BUILD_ID',
       'CI_REPO_NAME',
       'CI_PROJECT_ID',
+      'CI_PR_NUMBER',
+      'CI_PULL_REQUEST',
     ]),
     // https://concourse-ci.org/implementing-resource-types.html#resource-metadata
     concourse: extract([
@@ -248,6 +274,11 @@ const _providerCiParams = () => {
       'GITHUB_RUN_ID',
       'GITHUB_RUN_ATTEMPT',
       'GITHUB_REPOSITORY',
+      'GITHUB_BASE_REF',
+      'GITHUB_HEAD_REF',
+      'GITHUB_REF_NAME',
+      'GITHUB_REF',
+      'GITHUB_JOB',
     ]),
     // see https://docs.gitlab.com/ee/ci/variables/
     gitlab: extract([
@@ -266,7 +297,9 @@ const _providerCiParams = () => {
       'CI_REPOSITORY_URL',
       'CI_ENVIRONMENT_URL',
       'CI_DEFAULT_BRANCH',
-    // for PRs: https://gitlab.com/gitlab-org/gitlab-ce/issues/23902
+      // for PRs: https://gitlab.com/gitlab-org/gitlab-ce/issues/23902
+      'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME',
+      'CI_MERGE_REQUEST_SOURCE_BRANCH_SHA',
     ]),
     // https://docs.gocd.org/current/faq/dev_use_current_revision_in_build.html#standard-gocd-environment-variables
     goCD: extract([
@@ -294,13 +327,26 @@ const _providerCiParams = () => {
       'TAG_NAME',
       'COMMIT_SHA',
       'SHORT_SHA',
+      '_HEAD_BRANCH',
+      '_BASE_BRANCH',
+      '_PR_NUMBER',
       // https://cloud.google.com/cloud-build/docs/api/reference/rest/Shared.Types/Build
     ]),
+    /**
+     * References:
+     * https://ci.eclipse.org/webtools/env-vars.html/
+     * https://www.jenkins.io/doc/book/pipeline/multibranch/#additional-environment-variables
+     */
     jenkins: extract([
       'BUILD_ID',
       'BUILD_URL',
       'BUILD_NUMBER',
       'ghprbPullId',
+      // Jenkins pipeline options change options
+      'CHANGE_ID',
+      'CHANGE_URL',
+      'CHANGE_TARGET',
+      'CHANGE_TITLE',
     ]),
     // https://semaphoreci.com/docs/available-environment-variables.html
     // some come from v1, some from v2 of semaphore
@@ -312,11 +358,13 @@ const _providerCiParams = () => {
       'SEMAPHORE_EXECUTABLE_UUID',
       'SEMAPHORE_GIT_BRANCH',
       'SEMAPHORE_GIT_DIR',
+      'SEMAPHORE_GIT_PR_NUMBER',
       'SEMAPHORE_GIT_REF',
       'SEMAPHORE_GIT_REF_TYPE',
       'SEMAPHORE_GIT_REPO_SLUG',
       'SEMAPHORE_GIT_SHA',
       'SEMAPHORE_GIT_URL',
+      'SEMAPHORE_GIT_WORKING_BRANCH',
       'SEMAPHORE_JOB_COUNT',
       'SEMAPHORE_JOB_ID', // v2
       'SEMAPHORE_JOB_NAME',
@@ -389,15 +437,15 @@ const _providerCiParams = () => {
       'DEPLOY_PRIME_URL',
       'DEPLOY_ID',
     ]),
-    // https://layerci.com/docs/layerfile-reference/build-env
-    layerci: extract([
-      'LAYERCI_JOB_ID',
-      'LAYERCI_RUNNER_ID',
+    // https://docs.webapp.io/layerfile-reference/build-env
+    webappio: extract([
+      'JOB_ID',
+      'RUNNER_ID',
       'RETRY_INDEX',
-      'LAYERCI_PULL_REQUEST',
-      'LAYERCI_REPO_NAME',
-      'LAYERCI_REPO_OWNER',
-      'LAYERCI_BRANCH',
+      'PULL_REQUEST_URL',
+      'REPOSITORY_NAME',
+      'REPOSITORY_OWNER',
+      'GIT_BRANCH',
       'GIT_TAG', // short hex for commits
     ]),
   }
@@ -511,7 +559,13 @@ const _providerCommitParams = () => {
     },
     githubActions: {
       sha: env.GITHUB_SHA,
-      branch: env.GH_BRANCH || env.GITHUB_REF,
+      // GH_BRANCH       - populated with HEAD branch by cypress/github-action
+      // GITHUB_HEAD_REF - populated with the head ref or source branch
+      //                   of the pull request in a workflow run and is
+      //                   otherwise unset
+      // GITHUB_REF_NAME - populated with short ref name of the branch or
+      //                   tag that triggered the workflow run
+      branch: env.GH_BRANCH || env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME,
       defaultBranch: env.GITHUB_BASE_REF,
       remoteBranch: env.GITHUB_HEAD_REF,
       runAttempt: env.GITHUB_RUN_ATTEMPT,
@@ -536,17 +590,17 @@ const _providerCommitParams = () => {
     },
     jenkins: {
       sha: env.GIT_COMMIT,
-      branch: env.GIT_BRANCH,
-      // message: ???
-      // authorName: ???
-      // authorEmail: ???
+      branch: env.GIT_BRANCH || env.BRANCH_NAME || env.CHANGE_BRANCH,
+      // message: ??,
+      authorName: env.GIT_AUTHOR_NAME || env.CHANGE_AUTHOR_DISPLAY_NAME,
+      authorEmail: env.GIT_AUTHOR_EMAIL || env.CHANGE_AUTHOR_EMAIL,
       // remoteOrigin: ???
       // defaultBranch: ???
     },
     // Only from forks? https://semaphoreci.com/docs/available-environment-variables.html
     semaphore: {
       sha: env.SEMAPHORE_GIT_SHA,
-      branch: env.SEMAPHORE_GIT_BRANCH,
+      branch: env.SEMAPHORE_GIT_WORKING_BRANCH,
       // message: ???
       // authorName: ???
       // authorEmail: ???
@@ -586,9 +640,9 @@ const _providerCommitParams = () => {
       branch: env.BRANCH,
       remoteOrigin: env.REPOSITORY_URL,
     },
-    layerci: {
+    webappio: {
       sha: env.GIT_COMMIT,
-      branch: env.LAYERCI_BRANCH,
+      branch: env.GIT_BRANCH,
       message: env.GIT_COMMIT_TITLE,
     },
   }
@@ -614,7 +668,12 @@ const _get = (fn) => {
 }
 
 const ciParams = () => {
-  return _get(_providerCiParams)
+  const ciParams = {
+    ..._.chain(_userProvidedProviderCiParams()).thru(omitUndefined).defaultTo(null).value(),
+    ..._get(_providerCiParams),
+  }
+
+  return Object.keys(ciParams).length > 0 ? ciParams : null
 }
 
 const commitParams = () => {
@@ -668,6 +727,8 @@ const detectableCiBuildIdProviders = () => {
 }
 
 module.exports = {
+  getIsCi,
+
   list,
 
   provider,

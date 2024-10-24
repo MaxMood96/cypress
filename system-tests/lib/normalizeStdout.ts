@@ -1,5 +1,6 @@
 import Fixtures from './fixtures'
 import _ from 'lodash'
+import os from 'os'
 
 export const e2ePath = Fixtures.projectPath('e2e')
 
@@ -37,6 +38,10 @@ const replaceDurationFromReporter = (str: string, p1: string, p2: string, p3: st
   return p1 + _.padEnd('X', p2.length, 'X') + p3
 }
 
+const replaceShortDuration = (str: string, prefix: string, p2: string, p3: string, p4: string, count: string): string => {
+  return `${prefix} Xm, Ys ZZ.ZZms ${count}`
+}
+
 const replaceNodeVersion = (str: string, p1: string, p2: string, p3: string) => {
   // Accounts for paths that break across lines
   const p3Length = p3.includes('\n') ? p3.split('\n')[0].length - 1 : p3.length
@@ -55,23 +60,17 @@ const replaceDurationInTables = (str: string, p1: string, p2: string) => {
   return _.padStart('XX:XX', p1.length + p2.length)
 }
 
-// could be (1 second) or (10 seconds)
-// need to account for shortest and longest
-const replaceParenTime = (str: string, p1: string) => {
-  return _.padStart('(X second)', p1.length)
+// since time lives on it's own line
+// we can replace the time with 'X second(s)' and pad the length of the expected string.
+// This accounts for the test taking 1 second, X seconds, or XX seconds, and so on.
+const replaceTime = (str: string, p1: string) => {
+  return _.padEnd('X second(s)', p1.length)
 }
 
 const replaceScreenshotDims = (str: string, p1: string) => _.padStart('(YxX)', p1.length)
 
-const replaceUploadingResults = function (orig: string, ...rest: string[]) {
-  const adjustedLength = Math.max(rest.length, 2)
-  const match = rest.slice(0, adjustedLength - 2)
-  const results = match[1].split('\n').map((res) => res.replace(/\(\d+\/(\d+)\)/g, '(*/$1)'))
-  .sort()
-  .join('\n')
-  const ret = match[0] + results + match[3]
-
-  return ret
+const replaceUploadActivityIndicator = function (str: string, preamble: string, activity: string, ..._) {
+  return `${preamble}. . . . .`
 }
 
 // this captures an entire stack trace and replaces it with [stack trace lines]
@@ -100,6 +99,10 @@ export const replaceStackTraceLines = (str: string, browserName: 'electron' | 'f
   return str.replace(stackTraceRegex, (match: string, ...parts: string[]) => {
     let post = parts[0]
 
+    console.log('POST:')
+    console.log(`"${post}"`)
+    console.log('/POST')
+
     if (browserName === 'firefox') {
       post = post.replace(whiteSpaceBetweenNewlines, '\n')
     }
@@ -117,6 +120,8 @@ export const normalizeStdout = function (str: string, options: any = {}) {
   // /Users/jane/........../ -> //foo/bar/.projects/
   // (Required when paths are printed outside of our own formatting)
   .split(pathUpToProjectName).join('/foo/bar/.projects')
+  // temp dir may change from run to run, normalize it to a fake dir
+  .split(os.tmpdir()).join('/os/tmpdir')
 
   // unless normalization is explicitly turned off then
   // always normalize the stdout replacing the browser text
@@ -146,11 +151,13 @@ export const normalizeStdout = function (str: string, options: any = {}) {
   .replace(/(Duration\:\s+)(\d+\sminutes?,\s+)?(\d+\sseconds?)(\s+)/g, replaceDurationSeconds)
   // duration='1589' -> duration='XXXX'
   .replace(/(duration\=\')(\d+)(\')/g, replaceDurationFromReporter)
-  // (15 seconds) -> (XX seconds)
-  .replace(/(\((\d+ minutes?,\s+)?\d+ seconds?\))/g, replaceParenTime)
+  // (in|after) (1m)|(1m, 10s)|(10s)|(10.12ms) 1/1 => '(in|after) XXm, YYs, ZZ.ZZms 1/1
+  .replace(/((in)|(after)) ((?:\d+m)|(?:\d+m, \d+s)|(?:\d+s)|(?:\d+\.\d+ms)) (\d+\/\d+)/g, replaceShortDuration)
+  // 15 seconds -> XX seconds
+  .replace(/((\d+ minutes?,\s+)?\d+ seconds? *)/g, replaceTime)
   .replace(/\r/g, '')
-  // replaces multiple lines of uploading results (since order not guaranteed)
-  .replace(/(Uploading Results.*?\n\n)((.*-.*[\s\S\r]){2,}?)(\n\n)/g, replaceUploadingResults)
+  // normalizes upload indicator to a consistent number of dots
+  .replace(/(Uploading Cloud Artifacts\: )([\. ]*)/g, replaceUploadActivityIndicator)
   // fix "Require stacks" for CI
   .replace(/^(\- )(\/.*\/packages\/server\/)(.*)$/gm, '$1$3')
   // Different browsers have different cross-origin error messages
@@ -169,6 +176,25 @@ export const normalizeStdout = function (str: string, options: any = {}) {
 
   if (str.includes(wdsFailedMsg)) {
     str = str.split('\n').filter((line) => !line.includes(wdsFailedMsg)).join('\n')
+  }
+
+  // in Firefox 130, height dimensions are off by 1 pixel in CI, so we need to fix the offset to match common snapshots
+  if (options.browser === 'firefox' && process.env.CI) {
+    const dimensionRegex = new RegExp(/(\((?<width>\d+)x(?<height>\d+)\))/g)
+
+    const matches = dimensionRegex.exec(str)
+
+    if (matches?.groups?.height && matches?.groups?.width) {
+      const height = parseInt(matches?.groups?.height)
+
+      // only happens on default height for whatever reason in firefox 130...
+      if (height === 719) {
+        const expectedHeight = height + 1
+        const expectedWidth = matches?.groups?.width
+
+        str = str.replaceAll(`(${expectedWidth}x${height})`, `(${expectedWidth}x${expectedHeight})`)
+      }
+    }
   }
 
   if (options.sanitizeScreenshotDimensions) {

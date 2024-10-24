@@ -1,7 +1,10 @@
+import type { ProjectFixtureDir } from '@tooling/system-tests/lib/fixtureDirs'
+
 export const shouldHaveTestResults = ({ passCount, failCount, pendingCount }) => {
   passCount = passCount || '--'
   failCount = failCount || '--'
 
+  cy.get('button.restart', { timeout: 30000 }).should('be.visible') // ensure tests are finished running
   cy.findByLabelText('Stats', { timeout: 10000 }).within(() => {
     cy.get('.passed .num', { timeout: 30000 }).should('have.text', `${passCount}`)
     cy.get('.failed .num', { timeout: 30000 }).should('have.text', `${failCount}`)
@@ -12,6 +15,8 @@ export const shouldHaveTestResults = ({ passCount, failCount, pendingCount }) =>
   })
 }
 
+type ExperimentalRetriesProjects = 'detect-flake-and-pass-on-threshold' | 'detect-flake-but-always-fail' | 'detect-flake-but-always-fail-stop-any-passed'
+
 export type LoadSpecOptions = {
   filePath: string
   setup?: () => void
@@ -19,7 +24,7 @@ export type LoadSpecOptions = {
   failCount?: number | string
   pendingCount?: number | string
   hasPreferredIde?: boolean
-  projectName?: 'runner-e2e-specs' | 'runner-ct-specs' | 'session-and-origin-e2e-specs'
+  projectName?: 'runner-e2e-specs' | 'runner-ct-specs' | 'session-and-origin-e2e-specs' | ExperimentalRetriesProjects
   mode?: 'e2e' | 'component'
   configFile?: string
   scaffold?: boolean
@@ -43,7 +48,12 @@ export function loadSpec (options: LoadSpecOptions) {
     cy.scaffoldProject(projectName)
   }
 
-  cy.openProject(projectName, ['--config-file', configFile])
+  if (mode === 'component') {
+    cy.openProject(projectName, ['--config-file', configFile, '--component'])
+  } else {
+    cy.openProject(projectName, ['--config-file', configFile])
+  }
+
   cy.startAppServer(mode)
 
   cy.withCtx((ctx, options) => {
@@ -76,9 +86,10 @@ export function loadSpec (options: LoadSpecOptions) {
   shouldHaveTestResults({ passCount, failCount, pendingCount })
 }
 
-export function runSpec ({ fileName }: { fileName: string }) {
-  cy.scaffoldProject('runner-e2e-specs')
-  cy.openProject('runner-e2e-specs')
+export function runSpec ({ fileName, projectName }: { fileName: string, projectName?: ProjectFixtureDir }) {
+  projectName = projectName || 'runner-e2e-specs'
+  cy.scaffoldProject(projectName)
+  cy.openProject(projectName)
   cy.startAppServer()
 
   cy.visitApp(`specs/runner?file=cypress/e2e/runner/${fileName}`)

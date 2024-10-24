@@ -14,6 +14,8 @@ This preprocessor is a wrapper for [@cypress/webpack-preprocessor](https://githu
 
 Note that installing [@cypress/webpack-preprocessor](https://github.com/cypress-io/cypress-webpack-preprocessor) is also required. This allows you to update its version separately from this wrapper.
 
+For webpack `v5`, use `@cypress/webpack-batteries-included-preprocessor@3.x.x`. For webpack `v4`, use `@cypress/webpack-batteries-included-preprocessor@2.x.x`.
+
 ```sh
 npm install --save-dev @cypress/webpack-batteries-included-preprocessor @cypress/webpack-preprocessor
 ```
@@ -42,7 +44,7 @@ module.exports = (on) => {
 }
 ```
 
-Other than the `typescript` option, this preprocessor supports the same options as [@cypress/webpack-preprocessor](https://github.com/cypress-io/cypress/tree/develop/npm/webpack-preprocessor#readme), so see its README for more information.
+Other than the `typescript` option, this preprocessor supports the same options as [@cypress/webpack-preprocessor](https://github.com/cypress-io/cypress/tree/develop/npm/webpack-preprocessor#readme), so see its [README](https://github.com/cypress-io/cypress/tree/develop/npm/webpack-preprocessor#readme) for more information.
 
 ## Contributing
 

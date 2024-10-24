@@ -6,17 +6,15 @@
   "main": "dist/packherd.js",
   "scripts": {
     "build": "tsc",
-    "build-prod": "yarn build",
-    "check-ts": "tsc --noEmit && yarn -s tslint",
-    "clean-deps": "rimraf node_modules",
+    "check-ts": "tsc --noEmit",
     "clean": "rimraf dist",
+    "clean-deps": "rimraf node_modules",
     "test": "yarn test-integration",
     "test-integration": "mocha --config ./test/.mocharc.js",
-    "tslint": "tslint --config ../ts/tslint.json --project .",
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "debug": "^4.3.1",
+    "debug": "^4.3.4",
     "esbuild": "^0.15.3"
   },
   "devDependencies": {
@@ -27,5 +25,6 @@
     "dist",
     "src/packherd.ts"
   ],
-  "types": "src/packherd.ts"
+  "types": "src/packherd.ts",
+  "nx": {}
 }

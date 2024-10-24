@@ -20,7 +20,7 @@ import type { BrowserInstance } from './browsers/types'
 const debug = Debug('cypress:server:open_project')
 
 export class OpenProject {
-  private projectBase: ProjectBase<any> | null = null
+  private projectBase: ProjectBase | null = null
   relaunchBrowser: (() => Promise<BrowserInstance | null>) = () => {
     throw new Error('bad relaunch')
   }
@@ -94,7 +94,6 @@ export class OpenProject {
       isTextTerminal: !!cfg.isTextTerminal,
       downloadsFolder: cfg.downloadsFolder,
       experimentalModifyObstructiveThirdPartyCode: cfg.experimentalModifyObstructiveThirdPartyCode,
-      experimentalSessionAndOrigin: cfg.experimentalSessionAndOrigin,
       experimentalWebKitSupport: cfg.experimentalWebKitSupport,
       ...prevOptions || {},
     }
@@ -137,7 +136,7 @@ export class OpenProject {
         return Bluebird.resolve()
       }
 
-      return runEvents.execute('after:spec', cfg, spec)
+      return runEvents.execute('after:spec', spec)
     }
 
     const { onBrowserClose } = options
@@ -172,10 +171,12 @@ export class OpenProject {
 
       // TODO: Stub this so we can detect it being called
       if (process.env.CYPRESS_INTERNAL_E2E_TESTING_SELF) {
-        return await browsers.connectToExisting(browser, options, automation)
+        return await browsers.connectToExisting(browser, options, automation, this._ctx?.coreData.servers.cdpSocketServer)
       }
 
-      if (options.shouldLaunchNewTab) {
+      // if we should launch a new tab and we are not running in electron (which does not support connecting to a new spec)
+      // then we can connect to the new spec
+      if (options.shouldLaunchNewTab && browser.name !== 'electron') {
         const onInitializeNewBrowserTab = async () => {
           await this.resetBrowserState()
         }
@@ -183,12 +184,12 @@ export class OpenProject {
         // If we do not launch the browser,
         // we tell it that we are ready
         // to receive the next spec
-        return await browsers.connectToNewSpec(browser, { onInitializeNewBrowserTab, ...options }, automation)
+        return await browsers.connectToNewSpec(browser, { onInitializeNewBrowserTab, ...options }, automation, this._ctx?.coreData.servers.cdpSocketServer)
       }
 
       options.relaunchBrowser = this.relaunchBrowser
 
-      return await browsers.open(browser, options, automation, this._ctx)
+      return await browsers.open(browser, options, automation, this._ctx!)
     }
 
     return this.relaunchBrowser()
@@ -198,8 +199,14 @@ export class OpenProject {
     return browsers.close()
   }
 
-  async resetBrowserTabsForNextTest (shouldKeepTabOpen: boolean) {
-    return this.projectBase?.resetBrowserTabsForNextTest(shouldKeepTabOpen)
+  async resetBrowserTabsForNextSpec (shouldKeepTabOpen: boolean) {
+    try {
+      await this.projectBase?.resetBrowserTabsForNextSpec(shouldKeepTabOpen)
+    } catch (e) {
+      // If the CRI client disconnected or crashed, we want to no-op here so that anything
+      // depending on resetting the browser tabs can continue with further operations
+      return
+    }
   }
 
   async resetBrowserState () {
@@ -222,8 +229,14 @@ export class OpenProject {
     return this.closeOpenProjectAndBrowsers()
   }
 
+  async connectProtocolToBrowser (options) {
+    await browsers.connectProtocolToBrowser(options)
+  }
+
   changeUrlToSpec (spec: Cypress.Spec) {
     if (!this.projectBase) {
+      debug('No projectBase, cannot change url')
+
       return
     }
 
@@ -234,7 +247,32 @@ export class OpenProject {
 
     debug(`New url is ${newSpecUrl}`)
 
-    this.projectBase.server._socket.changeToUrl(newSpecUrl)
+    this.projectBase.server.socket.changeToUrl(newSpecUrl)
+  }
+
+  changeUrlToDebug (runNumber: number) {
+    if (!this.projectBase) {
+      debug('No projectBase, cannot change url')
+
+      return
+    }
+
+    const params = JSON.stringify({ from: 'notification', runNumber })
+
+    const newUrl = `#/redirect?name=Debug&params=${params}`
+
+    debug(`New url is ${newUrl}`)
+
+    this.projectBase.server.socket.changeToUrl(newUrl)
+  }
+
+  /**
+   * Sends the new telemetry context to the browser
+   * @param context - telemetry context string
+   * @returns
+   */
+  updateTelemetryContext (context: string) {
+    return this.projectBase?.server.socket.updateTelemetryContext(context)
   }
 
   // close existing open project if it exists, for example

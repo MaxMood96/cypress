@@ -41,7 +41,8 @@ describe('App: Spec List (E2E)', () => {
     })
 
     cy.visitApp()
-    cy.contains('E2E specs')
+    cy.specsPageIsVisible()
+    cy.verifyE2ESelected()
   }
 
   const clearSearchAndType = (search: string) => {
@@ -67,10 +68,6 @@ describe('App: Spec List (E2E)', () => {
       cy.findByTestId('app-header-bar').findByText('Specs').should('be.visible')
     })
 
-    it('shows the "E2E specs" label as the header for the Spec Name column', () => {
-      cy.findByTestId('specs-testing-type-header').should('contain', 'E2E specs')
-    })
-
     it('shows a git status for each spec', () => {
       cy.findAllByTestId('git-info-row').each((row) => {
         cy.wrap(row).find('svg').should('have.length', 1)
@@ -85,22 +82,34 @@ describe('App: Spec List (E2E)', () => {
       cy.findAllByTestId('spec-item').should('contain', 'dom-content.spec.js')
     })
 
-    it('opens the "Create a new spec" modal after clicking the "New specs" button', () => {
+    it('lists files after folders when in same directory', () => {
+      cy.findAllByTestId('row-directory-depth-2').first().click()
+
+      const rowId = getPathForPlatform('speclist-cypress/e2e/admin_users/').replaceAll('\\', '\\\\')
+
+      cy.get(`[id="${rowId}"]`)
+      .next()
+      .should('contain', 'admin.user')
+      .next()
+      .should('contain', 'admin_users_list.spec.js')
+    })
+
+    it('opens the "Create new spec" modal after clicking the "New specs" button', () => {
       cy.findByTestId('standard-modal').should('not.exist')
       cy.findByTestId('new-spec-button').click()
-      cy.findByTestId('standard-modal').get('h2').contains('Create a new spec')
+      cy.findByTestId('standard-modal').get('h2').contains('Create new spec')
       cy.get('button').contains('Scaffold example specs').should('be.visible')
-      cy.get('button').contains('Create new empty spec').should('be.visible')
+      cy.get('button').contains('Create new spec').should('be.visible')
       cy.get('button').get('[aria-label="Close"]').click()
       cy.findByTestId('standard-modal').should('not.exist')
     })
 
-    it('has the correct defaultSpecFileName in the "Create a new spec" modal', () => {
+    it('has the correct defaultSpecFileName in the "Create new spec" modal', () => {
       cy.findByTestId('standard-modal').should('not.exist')
       cy.findByTestId('new-spec-button').click()
-      cy.findByTestId('standard-modal').get('h2').contains('Create a new spec')
+      cy.findByTestId('standard-modal').get('h2').contains('Create new spec')
       cy.get('button').contains('Scaffold example specs').should('be.visible')
-      cy.get('button').contains('Create new empty spec').should('be.visible').click()
+      cy.get('button').contains('Create new spec').should('be.visible').click()
       cy.get('input').get('[aria-label="Enter a relative path..."]').invoke('val').should('contain', getPathForPlatform('cypress/e2e/spec.spec.js'))
       cy.get('button').get('[aria-label="Close"]').click()
     })
@@ -144,21 +153,21 @@ describe('App: Spec List (E2E)', () => {
 
       it('displays only matching spec', function () {
         cy.get('button')
-        .contains('23 matches')
+        .contains('28 matches')
         .should('not.contain.text', 'of')
 
         clearSearchAndType('content')
         cy.findAllByTestId('spec-item')
-        .should('have.length', 2)
+        .should('have.length', 3)
         .and('contain', 'dom-content.spec.js')
 
-        cy.get('button').contains('2 of 23 matches')
+        cy.get('button').contains('3 of 28 matches')
 
         cy.findByLabelText('Search specs').clear().type('asdf')
         cy.findAllByTestId('spec-item')
         .should('have.length', 0)
 
-        cy.get('button').contains('0 of 23 matches')
+        cy.get('button').contains('0 of 28 matches')
       })
 
       it('only shows matching folders', () => {
@@ -177,6 +186,20 @@ describe('App: Spec List (E2E)', () => {
         cy.findByTestId('spec-item')
         .should('have.length', 1)
         .and('contain', 'app.spec.js')
+      })
+
+      it('search by digits inside long strings', function () {
+        clearSearchAndType('4276')
+
+        cy.findByTestId('spec-item')
+        .should('have.length', 1)
+        .and('contain', 'dummyTest4276_test.spec.js')
+
+        clearSearchAndType('7890')
+
+        cy.findByTestId('spec-item')
+        .should('have.length', 1)
+        .and('contain', 'dummy7890Test_test.spec.js')
       })
 
       it('ignores non-number characters', function () {
@@ -209,7 +232,7 @@ describe('App: Spec List (E2E)', () => {
         cy.findByLabelText('Search specs')
         .should('have.value', '')
 
-        cy.get('button').contains('23 matches')
+        cy.get('button').contains('28 matches')
       })
 
       it('clears the filter if the user presses ESC key', function () {
@@ -218,7 +241,7 @@ describe('App: Spec List (E2E)', () => {
 
         cy.get('@searchField').should('have.value', '')
 
-        cy.get('button').contains('23 matches')
+        cy.get('button').contains('28 matches')
       })
 
       it('shows empty message if no results', function () {
@@ -234,7 +257,7 @@ describe('App: Spec List (E2E)', () => {
         cy.findByText('Clear search').click()
         cy.focused().should('have.id', 'spec-filter')
 
-        cy.get('button').contains('23 matches')
+        cy.get('button').contains('28 matches')
       })
 
       it('normalizes directory path separators for Windows', function () {
@@ -245,18 +268,87 @@ describe('App: Spec List (E2E)', () => {
         cy.findByText('No specs matched your search:').should('not.be.visible')
       })
 
-      // TODO: fix flaky test https://github.com/cypress-io/cypress/issues/23305
-      it.skip('saves the filter when navigating to a spec and back', function () {
+      it('searches specs with "-" or "_" when search contains space', function () {
+        clearSearchAndType('accounts list')
+
+        cy.findAllByTestId('spec-item')
+        .should('have.length', 1)
+        .and('contain', 'accounts_list.spec.js')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('searches specs with "-" or "_" when search contains "-"', function () {
+        clearSearchAndType('accounts-list')
+
+        cy.findAllByTestId('spec-item')
+        .should('have.length', 1)
+        .and('contain', 'accounts_list.spec.js')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('searches specs with "-" or "_" when search contains "_"', function () {
+        clearSearchAndType('accounts_list')
+
+        cy.findAllByTestId('spec-item')
+        .should('have.length', 1)
+        .and('contain', 'accounts_list.spec.js')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('searches folders with "-" or "_" when search contains space', function () {
+        clearSearchAndType('a b c')
+
+        cy.findAllByTestId('spec-list-directory')
+        .should('have.length', 1)
+        .and('contain', 'a-b_c')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('searches folders with "-" or "_" when search contains "-"', function () {
+        clearSearchAndType('a-b-c')
+
+        cy.findAllByTestId('spec-list-directory')
+        .should('have.length', 1)
+        .and('contain', 'a-b_c')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('searches folders with "-" or "_" when search contains "_"', function () {
+        clearSearchAndType('a_b_c')
+
+        cy.findAllByTestId('spec-list-directory')
+        .should('have.length', 1)
+        .and('contain', 'a-b_c')
+
+        cy.findByText('No specs matched your search:').should('not.be.visible')
+      })
+
+      it('saves the filter when navigating to a spec and back', function () {
         const targetSpecFile = 'accounts_list.spec.js'
 
         clearSearchAndType(targetSpecFile)
+
+        // wait for filter
+        cy.findAllByTestId('spec-item').should('have.length', 1)
+
         cy.contains('a', targetSpecFile).click()
+
+        // make sure we are on the spec view before clicking back to the specs list
+        cy.findByTestId('runnable-header').contains(targetSpecFile)
 
         cy.contains('input', targetSpecFile).should('not.exist')
 
-        cy.get('button[aria-controls="reporter-inline-specs-list"]').click({ force: true })
+        cy.contains('button', 'Specs').click({ force: true })
 
-        cy.get('input').should('be.visible').and('have.value', targetSpecFile)
+        // wait until specs list is visible
+        cy.findByTestId('specs-list-container').should('be.visible')
+
+        cy.get('@searchField').should('have.value', targetSpecFile)
 
         cy.findByTestId('sidebar-link-specs-page').click()
 

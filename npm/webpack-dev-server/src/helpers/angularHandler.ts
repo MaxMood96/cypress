@@ -1,10 +1,16 @@
 import * as fs from 'fs-extra'
 import { tmpdir } from 'os'
 import * as path from 'path'
-import type { Configuration } from 'webpack'
+import { gte } from 'semver'
+import type { Configuration, RuleSetRule } from 'webpack'
 import type { PresetHandlerResult, WebpackDevServerConfig } from '../devServer'
 import { dynamicAbsoluteImport, dynamicImport } from '../dynamic-import'
 import { sourceDefaultWebpackDependencies } from './sourceRelativeWebpackModules'
+import debugLib from 'debug'
+import type { logging as AngularLogging } from '@angular-devkit/core'
+
+const debugPrefix = 'cypress:webpack-dev-server:angularHandler'
+const debug = debugLib(debugPrefix)
 
 export type BuildOptions = Record<string, any>
 
@@ -41,7 +47,7 @@ export async function getProjectConfig (projectRoot: string): Promise<Cypress.An
     defaultProject = Object.keys(angularJson.projects).find((name) => angularJson.projects[name].projectType === 'application')
 
     if (!defaultProject) {
-      throw new Error('Could not find a project with projectType "application" in "angular.json". Visit https://docs.cypress.io/guides/references/configuration#Options-API to see how to pass in a custom project configuration')
+      throw new Error('Could not find a project with projectType "application" in "angular.json". Visit https://on.cypress.io/configuration to see how to pass in a custom project configuration')
     }
   }
 
@@ -110,12 +116,13 @@ export function getAngularBuildOptions (buildOptions: BuildOptions, tsConfig: st
 export async function generateTsConfig (devServerConfig: AngularWebpackDevServerConfig, buildOptions: BuildOptions): Promise<string> {
   const { cypressConfig } = devServerConfig
   const { projectRoot } = cypressConfig
+  const { workspaceRoot = projectRoot } = buildOptions
 
   const specPattern = Array.isArray(cypressConfig.specPattern) ? cypressConfig.specPattern : [cypressConfig.specPattern]
 
-  const getProjectFilePath = (...fileParts: string[]): string => toPosix(path.join(projectRoot, ...fileParts))
+  const getProjectFilePath = (...fileParts: string[]): string => toPosix(path.join(...fileParts))
 
-  const includePaths = [...specPattern.map((pattern) => getProjectFilePath(pattern))]
+  const includePaths = [...specPattern.map((pattern) => getProjectFilePath(projectRoot, pattern))]
 
   if (cypressConfig.supportFile) {
     includePaths.push(toPosix(cypressConfig.supportFile))
@@ -126,32 +133,36 @@ export async function generateTsConfig (devServerConfig: AngularWebpackDevServer
       ? buildOptions.polyfills.filter((p: string) => devServerConfig.options?.projectConfig.sourceRoot && p.startsWith(devServerConfig.options?.projectConfig.sourceRoot))
       : [buildOptions.polyfills]
 
-    includePaths.push(...polyfills.map((p: string) => getProjectFilePath(p)))
+    includePaths.push(...polyfills.map((p: string) => getProjectFilePath(workspaceRoot, p)))
   }
 
-  const cypressTypes = getProjectFilePath('node_modules', 'cypress', 'types', 'index.d.ts')
+  const typeRoots = [
+    getProjectFilePath(workspaceRoot, 'node_modules'),
+  ]
 
-  includePaths.push(cypressTypes)
+  const types = ['cypress']
 
   const tsConfigContent = JSON.stringify({
-    extends: getProjectFilePath(buildOptions.tsConfig ?? 'tsconfig.json'),
+    extends: getProjectFilePath(projectRoot, buildOptions.tsConfig ?? 'tsconfig.json'),
     compilerOptions: {
-      outDir: getProjectFilePath('out-tsc/cy'),
+      outDir: getProjectFilePath(projectRoot, 'out-tsc/cy'),
       allowSyntheticDefaultImports: true,
       skipLibCheck: true,
+      types,
+      typeRoots,
     },
     include: includePaths,
-  })
+  }, null, 2)
 
-  const tsConfigPath = path.join(await getTempDir(), 'tsconfig.json')
+  const tsConfigPath = path.join(await getTempDir(path.basename(projectRoot)), 'tsconfig.json')
 
   await fs.writeFile(tsConfigPath, tsConfigContent)
 
   return tsConfigPath
 }
 
-export async function getTempDir (): Promise<string> {
-  const cypressTempDir = path.join(tmpdir(), 'cypress-angular-ct')
+export async function getTempDir (projectName: string): Promise<string> {
+  const cypressTempDir = path.join(tmpdir(), 'cypress-angular-ct', projectName)
 
   await fs.ensureDir(cypressTempDir)
 
@@ -159,23 +170,37 @@ export async function getTempDir (): Promise<string> {
 }
 
 export async function getAngularCliModules (projectRoot: string) {
+  let angularVersion: string
+
+  try {
+    angularVersion = await getInstalledPackageVersion('@angular-devkit/core', projectRoot)
+  } catch {
+    throw new Error(`Could not resolve "@angular-devkit/core". Do you have it installed?`)
+  }
+
   const angularCLiModules = [
     '@angular-devkit/build-angular/src/utils/webpack-browser-config.js',
-    '@angular-devkit/build-angular/src/webpack/configs/common.js',
-    '@angular-devkit/build-angular/src/webpack/configs/styles.js',
+    // in Angular 16.1 the locations of these files below were changed
+    ...(
+      gte(angularVersion, '16.1.0')
+        ? ['@angular-devkit/build-angular/src/tools/webpack/configs/common.js', '@angular-devkit/build-angular/src/tools/webpack/configs/styles.js']
+        : ['@angular-devkit/build-angular/src/webpack/configs/common.js', '@angular-devkit/build-angular/src/webpack/configs/styles.js']
+    ),
+    '@angular-devkit/core/src/index.js',
   ] as const
 
   const [
     { generateBrowserWebpackConfigFromContext },
     { getCommonConfig },
     { getStylesConfig },
+    { logging },
   ] = await Promise.all(angularCLiModules.map((dep) => {
     try {
       const depPath = require.resolve(dep, { paths: [projectRoot] })
 
       return dynamicAbsoluteImport(depPath)
     } catch (e) {
-      throw new Error(`Could not resolve "${dep}". Do you have "@angular-devkit/build-angular" installed?`)
+      throw new Error(`Could not resolve "${dep}". Do you have "@angular-devkit/build-angular" and "@angular-devkit/core" installed?`)
     }
   }))
 
@@ -183,7 +208,17 @@ export async function getAngularCliModules (projectRoot: string) {
     generateBrowserWebpackConfigFromContext,
     getCommonConfig,
     getStylesConfig,
+    logging,
   }
+}
+
+async function getInstalledPackageVersion (pkgName: string, projectRoot: string): Promise<string> {
+  const packageJsonPath = require.resolve(`${pkgName}/package.json`, { paths: [projectRoot] })
+  const { version } = JSON.parse(
+    await fs.readFile(packageJsonPath, { encoding: 'utf-8' }),
+  )
+
+  return version
 }
 
 export async function getAngularJson (projectRoot: string): Promise<AngularJson> {
@@ -200,14 +235,13 @@ export async function getAngularJson (projectRoot: string): Promise<AngularJson>
   return JSON.parse(angularJson)
 }
 
-function createFakeContext (projectRoot: string, defaultProjectConfig: Cypress.AngularDevServerProjectConfig) {
-  const logger = {
-    createChild: () => {
-      return {
-        warn: () => {},
-      }
-    },
-  }
+function createFakeContext (projectRoot: string, defaultProjectConfig: Cypress.AngularDevServerProjectConfig, logging: typeof AngularLogging) {
+  const logger = new logging.Logger(debugPrefix)
+
+  // Proxy all logging calls through to the debug logger
+  logger.forEach((value: AngularLogging.LogEntry) => {
+    debug(JSON.stringify(value))
+  })
 
   const context = {
     target: {
@@ -217,7 +251,7 @@ function createFakeContext (projectRoot: string, defaultProjectConfig: Cypress.A
     getProjectMetadata: () => {
       return {
         root: defaultProjectConfig.root,
-        sourceRoot: defaultProjectConfig.root,
+        sourceRoot: defaultProjectConfig.sourceRoot,
         projectType: 'application',
       }
     },
@@ -236,6 +270,7 @@ async function getAngularCliWebpackConfig (devServerConfig: AngularWebpackDevSer
     generateBrowserWebpackConfigFromContext,
     getCommonConfig,
     getStylesConfig,
+    logging,
   } = await getAngularCliModules(projectRoot)
 
   // normalize
@@ -245,12 +280,43 @@ async function getAngularCliWebpackConfig (devServerConfig: AngularWebpackDevSer
 
   const buildOptions = getAngularBuildOptions(projectConfig.buildOptions, tsConfig)
 
-  const context = createFakeContext(projectRoot, projectConfig)
+  const context = createFakeContext(projectConfig.buildOptions.workspaceRoot || projectRoot, projectConfig, logging)
 
   const { config } = await generateBrowserWebpackConfigFromContext(
     buildOptions,
     context,
-    (wco: any) => [getCommonConfig(wco), getStylesConfig(wco)],
+    (wco: any) => {
+      // Starting in Angular 16, the `getStylesConfig` function returns a `Promise`.
+      // We wrap it with `Promise.resolve` so we support older version of Angular
+      // returning a non-Promise result.
+      const stylesConfig = Promise.resolve(getStylesConfig(wco)).then((config) => {
+        // We modify resolve-url-loader and set `root` to be `projectRoot` + `sourceRoot` to ensure
+        // imports in scss, sass, etc are correctly resolved.
+        // https://github.com/cypress-io/cypress/issues/24272
+        config.module.rules.forEach((rule: RuleSetRule) => {
+          rule.rules?.forEach((ruleSet) => {
+            if (!Array.isArray(ruleSet.use)) {
+              return
+            }
+
+            ruleSet.use.map((loader) => {
+              if (typeof loader !== 'object' || typeof loader.options !== 'object' || !loader.loader?.includes('resolve-url-loader')) {
+                return
+              }
+
+              const root = projectConfig.buildOptions.workspaceRoot || path.join(devServerConfig.cypressConfig.projectRoot, projectConfig.sourceRoot)
+
+              debug('Adding root %s to resolve-url-loader options', root)
+              loader.options.root = root
+            })
+          })
+        })
+
+        return config
+      })
+
+      return [getCommonConfig(wco), stylesConfig]
+    },
   )
 
   delete config.entry.main

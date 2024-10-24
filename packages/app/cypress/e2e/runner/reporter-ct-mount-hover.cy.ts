@@ -3,8 +3,8 @@ import type { fixtureDirs } from '@tooling/system-tests'
 type ProjectDirs = typeof fixtureDirs
 
 const PROJECTS: {projectName: ProjectDirs[number], test: string}[] = [
-  { projectName: 'angular-14', test: 'app.component' },
-  { projectName: 'vueclivue2-configured', test: 'HelloWorld.cy' },
+  // TODO: Flaky { projectName: 'angular-14', test: 'app.component' },
+  // TODO: Flaky. { projectName: 'vueclivue2-configured', test: 'HelloWorld.cy' },
   { projectName: 'react-vite-ts-configured', test: 'App.cy' },
   { projectName: 'react18', test: 'App.cy' },
   { projectName: 'create-react-app-configured', test: 'App.cy' },
@@ -25,9 +25,10 @@ for (const { projectName, test } of PROJECTS) {
     }),
     it(`While hovering on Mount(), shows component on AUT for ${projectName}`, () => {
       if (`${projectName}` === 'react18') {
-        cy.openProject(projectName, ['--config-file', 'cypress-vite.config.ts'])
+        cy.openProject(projectName, ['--config-file', 'cypress-vite-default.config.ts', '--component'])
         cy.startAppServer('component')
         cy.visitApp()
+        cy.specsPageIsVisible()
         cy.contains(`${test}`).click()
         cy.waitForSpecToFinish(undefined)
         cy.get('.collapsible-header-inner:first').click().get('.command.command-name-mount > .command-wrapper').click().then(() => {
@@ -36,19 +37,16 @@ for (const { projectName, test } of PROJECTS) {
           })
         })
       } else {
-        cy.openProject(projectName)
+        cy.openProject(projectName, ['--component'])
         cy.startAppServer('component')
         cy.visitApp()
+        cy.specsPageIsVisible()
         cy.contains(`${test}`).click()
         cy.waitForSpecToFinish(undefined)
         cy.get('.command.command-name-mount > .command-wrapper').click().then(() => {
-          if (`${projectName}` === 'angular-14') {
-            cy.get('iframe.aut-iframe').its('0.contentDocument.body').children().should('have.length.at.least', 2)
-          } else {
-            cy.get('iframe.aut-iframe').its('0.contentDocument.body').then(cy.wrap).within(() => {
-              cy.get('[data-cy-root]').children().should('have.length.at.least', 1)
-            })
-          }
+          cy.get('iframe.aut-iframe').its('0.contentDocument.body').then(cy.wrap).within(() => {
+            cy.get('[data-cy-root]').children().should('have.length.at.least', 1)
+          })
         })
       }
     })

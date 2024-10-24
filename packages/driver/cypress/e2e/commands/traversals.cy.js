@@ -1,8 +1,6 @@
 const { assertLogLength } = require('../../support/utils')
 const { _, $, dom } = Cypress
 
-const helpers = require('../../support/helpers')
-
 describe('src/cy/commands/traversals', () => {
   beforeEach(() => {
     cy.visit('/fixtures/dom.html')
@@ -95,7 +93,7 @@ describe('src/cy/commands/traversals', () => {
           })
 
           cy.on('fail', (err) => {
-            expect(err.message).to.include(`\`cy.${name}()\` failed because this element`)
+            expect(err.message).to.include(`\`cy.${name}()\` failed because it requires a DOM element`)
 
             done()
           })
@@ -108,7 +106,7 @@ describe('src/cy/commands/traversals', () => {
             node = dom.stringify(cy.$$(node), 'short')
 
             cy.on('fail', (err) => {
-              expect(err.message).to.include(`Expected to find element: \`${el}\`, but never found it. Queried from element: ${node}`)
+              expect(err.message).to.include(`Expected to find element: \`${el}\`, but never found it. Queried from:`)
 
               done()
             })
@@ -144,8 +142,6 @@ describe('src/cy/commands/traversals', () => {
           cy.on('log:added', (attrs, log) => {
             this.lastLog = log
           })
-
-          return null
         })
 
         it('logs immediately before resolving', (done) => {
@@ -197,31 +193,46 @@ describe('src/cy/commands/traversals', () => {
 
         it('#consoleProps', () => {
           cy.get('#list')[name](arg).then(function ($el) {
-            const obj = { Command: name }
-
-            if (_.isFunction(arg)) {
-              obj.Selector = ''
-            } else {
-              obj.Selector = [].concat(arg).join(', ')
-            }
-
             const yielded = Cypress.dom.getElements($el)
 
-            _.extend(obj, {
-              'Applied To': helpers.getFirstSubjectByName('get').get(0),
-              Yielded: yielded,
-              Elements: $el.length,
+            expect(this.lastLog.invoke('consoleProps')).to.deep.eq({
+              name,
+              type: 'command',
+              props: {
+                Selector: _.isFunction(arg) ? '' : [].concat(arg).join(', '),
+                'Applied To': cy.$$('#list')[0],
+                Yielded: yielded,
+                Elements: $el.length,
+              },
             })
-
-            expect(this.lastLog.invoke('consoleProps')).to.deep.eq(obj)
           })
         })
 
-        it('can be turned off', () => {
+        it('can turn off logging when protocol is disabled', { protocolEnabled: false }, function () {
+          cy.on('_log:added', (attrs, log) => {
+            this.hiddenLog = log
+          })
+
           cy.get('#list')[name](arg, { log: false }).then(function () {
-            const { lastLog } = this
+            const { lastLog, hiddenLog } = this
 
             expect(lastLog.get('name')).to.eq('get')
+            expect(hiddenLog).to.be.undefined
+          })
+        })
+
+        it('can send hidden log when protocol is enabled', { protocolEnabled: true }, function () {
+          cy.on('_log:added', (attrs, log) => {
+            this.hiddenLog = log
+          })
+
+          cy.get('#list')[name](arg, { log: false }).then(function () {
+            const { lastLog, hiddenLog } = this
+
+            expect(lastLog.get('name')).to.eq('get')
+            expect(hiddenLog.get('name'), 'log name').to.eq(name)
+            expect(hiddenLog.get('hidden'), 'log hidden').to.be.true
+            expect(hiddenLog.get('snapshots').length, 'log snapshot length').to.eq(1)
           })
         })
       })
@@ -324,7 +335,7 @@ describe('src/cy/commands/traversals', () => {
 
     it('errors after timing out not finding element', (done) => {
       cy.on('fail', (err) => {
-        expect(err.message).to.include('Expected to find element: `span`, but never found it. Queried from element: <li.item>')
+        expect(err.message).to.include('Expected to find element: `span`, but never found it. Queried from:')
 
         done()
       })
@@ -346,16 +357,27 @@ describe('src/cy/commands/traversals', () => {
       const button = cy.$$('#button').hide()
 
       cy.on('fail', (err) => {
-        const log = this.logs[1]
+        assertLogLength(this.logs, 3)
 
-        expect(log.get('state')).to.eq('failed')
-        expect(err.message).to.include(log.get('error').message)
-        expect(log.get('$el').get(0)).to.eq(button.get(0))
+        const getLog = this.logs[0]
+        const findLog = this.logs[1]
+        const assertionLog = this.logs[2]
 
-        const consoleProps = log.invoke('consoleProps')
+        expect(err.message).to.contain('This element `<button#button>` is not visible because it has CSS property: `display: none`')
 
-        expect(consoleProps.Yielded).to.eq(button.get(0))
-        expect(consoleProps.Elements).to.eq(button.length)
+        expect(getLog.get('state')).to.eq('passed')
+        expect(getLog.get('error')).to.be.undefined
+
+        expect(findLog.get('state')).to.eq('passed')
+        expect(findLog.get('error')).to.be.undefined
+        expect(findLog.get('$el').get(0)).to.eq(button.get(0))
+        const consoleProps = findLog.invoke('consoleProps')
+
+        expect(consoleProps.props.Yielded).to.eq(button.get(0))
+        expect(consoleProps.props.Elements).to.eq(button.length)
+
+        expect(assertionLog.get('state')).to.eq('failed')
+        expect(err.message).to.include(assertionLog.get('error').message)
 
         done()
       })

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "rimraf dist && rollup -c rollup.config.mjs",
     "postbuild": "node ../../scripts/sync-exported-npm-with-cli.js",
-    "build-prod": "yarn build",
+    "check-ts": "tsc --noEmit",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx,.json, .",
     "watch": "yarn build --watch --watch.exclude ./dist/**/*"
   },
   "devDependencies": {
@@ -19,9 +20,9 @@
     "cypress": "0.0.0-development",
     "react": "^16",
     "react-dom": "^16",
-    "rollup": "^2.38.5",
+    "rollup": "3.7.3",
     "rollup-plugin-typescript2": "^0.29.0",
-    "typescript": "^4.7.4"
+    "typescript": "~5.4.5"
   },
   "peerDependencies": {
     "@types/react": "^18",
@@ -56,5 +57,15 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "outputs": [
+          "{workspaceRoot}/cli/react18",
+          "{projectRoot}/dist"
+        ]
+      }
+    }
   }
 }

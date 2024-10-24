@@ -16,7 +16,7 @@ import type { DataContext } from '..'
 import assert from 'assert'
 import type { AllModeOptions, FoundBrowser, FullConfig, TestingType } from '@packages/types'
 import { autoBindDebug } from '../util/autoBindDebug'
-import { GitDataSource, LegacyCypressConfigJson } from '../sources'
+import { EventCollectorSource, GitDataSource, LegacyCypressConfigJson } from '../sources'
 import { OnFinalConfigLoadedOptions, ProjectConfigManager } from './ProjectConfigManager'
 import pDefer from 'p-defer'
 import { EventRegistrar } from './EventRegistrar'
@@ -24,6 +24,7 @@ import { getServerPluginHandlers, resetPluginHandlers } from '../util/pluginHand
 import { detectLanguage } from '@packages/scaffold-config'
 import { validateNeedToRestartOnChange } from '@packages/config'
 import { MAJOR_VERSION_FOR_CONTENT } from '@packages/types'
+import { telemetry } from '@packages/telemetry'
 
 export interface SetupFullConfigOptions {
   projectName: string
@@ -103,6 +104,11 @@ export class ProjectLifecycleManager {
 
   async getProjectId (): Promise<string | null> {
     try {
+      // No need to kick off config initialization if we need to migrate
+      if (this.ctx.migration.needsCypressJsonMigration()) {
+        return null
+      }
+
       const contents = await this.ctx.project.getConfig()
 
       return contents.projectId ?? null
@@ -230,13 +236,38 @@ export class ProjectLifecycleManager {
         }
 
         if (this._currentTestingType === 'component') {
-          const devServerOptions = await this.ctx._apis.projectApi.getDevServer().start({ specs: this.ctx.project.specs, config: finalConfig })
+          const span = telemetry.startSpan({ name: 'dataContext:ct:startDevServer' })
+
+          /**
+             * We need to start the dev server in the ProjectLifecycleManager when:
+             *   1. GA component testing is running so we can compile the dev server will all specs matching the specPattern
+             *   2. experimentalJustInTimeCompile is enabled. In this case, we start a dev server
+             *      with an empty specs list to initially compile the support file and related dependencies in order to hopefully
+             *      leverage the dev server cache for recompiling for when we actually have a spec to add to the dev server entry.
+             */
+          const specsToStartDevServer = finalConfig.experimentalJustInTimeCompile ? [] : this.ctx.project.specs
+          const devServerOptions = await this.ctx._apis.projectApi.getDevServer().start({ specs: specsToStartDevServer, config: finalConfig })
+
+          // If we received a cypressConfig.port we want to null it out
+          // because we propagated it into the devServer.port and it is
+          // later set as baseUrl which cypress is launched into
+          //
+          // The special case is cypress in cypress testing. If that's the case, we still need
+          // the wrapper cypress to be running on 4455
+          if (!process.env.CYPRESS_INTERNAL_E2E_TESTING_SELF) {
+            finalConfig.port = null
+          } else {
+            finalConfig.port = 4455
+          }
 
           if (!devServerOptions?.port) {
+            span?.end()
             throw getError('CONFIG_FILE_DEV_SERVER_INVALID_RETURN', devServerOptions)
           }
 
           finalConfig.baseUrl = `http://localhost:${devServerOptions?.port}`
+
+          span?.end()
         }
 
         const pingBaseUrl = this._cachedFullConfig && this._cachedFullConfig.baseUrl !== finalConfig.baseUrl
@@ -368,12 +399,18 @@ export class ProjectLifecycleManager {
     }
 
     if (this._configManager?.isLoadingConfigFile) {
+      const span = telemetry.startSpan({ name: `dataContext:loadConfig` })
+
       try {
         await this.initializeConfig()
 
         return true
       } catch (error) {
+        this.ctx.debug('error thrown by initializeConfig', error)
+
         return false
+      } finally {
+        span?.end()
       }
     }
 
@@ -412,7 +449,15 @@ export class ProjectLifecycleManager {
         onGitInfoChange: (specPaths) => {
           this.ctx.emitter.gitInfoChange(specPaths)
         },
+        onGitLogChange: async (shas) => {
+          await this.ctx.relevantRuns.checkRelevantRuns(shas)
+        },
       })
+
+      s.eventCollectorSource?.destroy()
+      if (this.ctx.isOpenMode) {
+        s.eventCollectorSource = new EventCollectorSource(this.ctx)
+      }
 
       s.diagnostics = { error: null, warnings: [] }
       s.packageManager = packageManagerUsed
@@ -455,8 +500,6 @@ export class ProjectLifecycleManager {
     const legacyConfigPath = path.join(projectRoot, this.ctx.migration.legacyConfigFile)
 
     if (needsCypressJsonMigration && !this.ctx.isRunMode && this.ctx.fs.existsSync(legacyConfigPath)) {
-      this.legacyMigration(legacyConfigPath).catch(this.onLoadError)
-
       return false
     }
 
@@ -467,8 +510,9 @@ export class ProjectLifecycleManager {
     return this.metaState.hasValidConfigFile
   }
 
-  private async legacyMigration (legacyConfigPath: string) {
+  async legacyMigration () {
     try {
+      const legacyConfigPath = path.join(this.projectRoot, this.ctx.migration.legacyConfigFile)
       // we run the legacy plugins/index.js in a child process
       // and mutate the config based on the return value for migration
       // only used in open mode (cannot migrate via terminal)
@@ -477,8 +521,6 @@ export class ProjectLifecycleManager {
       // should never throw, unless there existing pluginsFile errors out,
       // in which case they are attempting to migrate an already broken project.
       await this.ctx.actions.migration.initialize(legacyConfig)
-
-      this.ctx.emitter.toLaunchpad()
     } catch (error) {
       this.onLoadError(error)
     }
@@ -558,6 +600,7 @@ export class ProjectLifecycleManager {
 
     await this.ctx.coreData.currentProjectGitInfo?.destroy()
     await this.ctx.project.destroy()
+    await this.ctx.coreData.eventCollectorSource?.destroy()
     this._currentTestingType = null
     this._cachedInitialConfig = undefined
     this._cachedFullConfig = undefined
@@ -568,7 +611,7 @@ export class ProjectLifecycleManager {
    * this sources the config from the various config sources
    */
   async getFullInitialConfig (options: Partial<AllModeOptions> = this.ctx.modeOptions, withBrowsers = true): Promise<FullConfig> {
-    assert(this._configManager, 'Cannot get full config a config manager')
+    assert(this._configManager, 'Cannot get full config without a config manager')
 
     return this._configManager.getFullInitialConfig(options, withBrowsers)
   }
@@ -630,7 +673,12 @@ export class ProjectLifecycleManager {
         metaState.isProjectUsingESModules = true
       }
 
-      metaState.isUsingTypeScript = detectLanguage({ projectRoot: this.projectRoot, pkgJson, isMigrating: metaState.hasLegacyCypressJson }) === 'ts'
+      metaState.isUsingTypeScript = detectLanguage({
+        projectRoot: this.projectRoot,
+        customConfigFile: configFile,
+        pkgJson,
+        isMigrating: metaState.hasLegacyCypressJson,
+      }) === 'ts'
     } catch {
       // No need to handle
     }
@@ -742,10 +790,27 @@ export class ProjectLifecycleManager {
     if (this._projectRoot && testingType && await this.waitForInitializeSuccess()) {
       this.setAndLoadCurrentTestingType(testingType)
 
-      if (testingType === 'e2e' && !this.ctx.migration.needsCypressJsonMigration() && !this.isTestingTypeConfigured(testingType)) {
-        // E2E doesn't have a wizard, so if we have a testing type on load we just create/update their cypress.config.js.
-        await this.ctx.actions.wizard.scaffoldTestingType()
-      }
+      await this.initializeProjectSetup(testingType)
+    }
+  }
+
+  /**
+   * Prepare the setup process for a project if one exists, otherwise complete setup
+   *
+   * @param testingType
+   * @returns
+   */
+  async initializeProjectSetup (testingType: TestingType) {
+    if (this.isTestingTypeConfigured(testingType)) {
+      return
+    }
+
+    if (testingType === 'e2e' && !this.ctx.migration.needsCypressJsonMigration()) {
+      // E2E doesn't have a wizard, so if we have a testing type on load we just create/update their cypress.config.js.
+      await this.ctx.actions.wizard.scaffoldTestingType()
+    } else if (testingType === 'component') {
+      await this.ctx.actions.wizard.detectFrameworks()
+      await this.ctx.actions.wizard.initialize()
     }
   }
 
@@ -757,6 +822,10 @@ export class ProjectLifecycleManager {
         return this.ctx.onError(getError('NO_DEFAULT_CONFIG_FILE_FOUND', this.projectRoot))
       }
 
+      const span = telemetry.startSpan({ name: 'dataContext:setAndLoadCurrentTestingType' })
+
+      span?.setAttributes({ testingType: testingType ? testingType : 'undefined' })
+
       if (testingType) {
         this.setAndLoadCurrentTestingType(testingType)
       } else {
@@ -765,6 +834,7 @@ export class ProjectLifecycleManager {
     }
 
     return this._pendingInitialize.promise.finally(() => {
+      telemetry.getSpan('dataContext:setAndLoadCurrentTestingType')?.end()
       this._pendingInitialize = undefined
     })
   }
@@ -800,5 +870,13 @@ export class ProjectLifecycleManager {
     } else {
       this.ctx.onError(err, 'Cypress configuration error')
     }
+  }
+
+  mainProcessWillDisconnect (): Promise<void> {
+    if (!this._configManager) {
+      return Promise.resolve()
+    }
+
+    return this._configManager.mainProcessWillDisconnect()
   }
 }

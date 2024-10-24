@@ -14,6 +14,7 @@ import {
   getTestBed,
   TestModuleMetadata,
   TestBed,
+  TestComponentRenderer,
 } from '@angular/core/testing'
 import {
   BrowserDynamicTestingModule,
@@ -21,12 +22,12 @@ import {
 } from '@angular/platform-browser-dynamic/testing'
 import {
   setupHooks,
+  getContainerEl,
 } from '@cypress/mount-utils'
 
 /**
  * Additional module configurations needed while mounting the component, like
  * providers, declarations, imports and even component @Inputs()
- *
  *
  * @interface MountConfig
  * @see https://angular.io/api/core/testing/TestModuleMetadata
@@ -114,6 +115,7 @@ export type MountResponse<T> = {
 // 'zone.js/testing' is not properly aliasing `it.skip` but it does provide `xit`/`xspecify`
 // Written up under https://github.com/angular/angular/issues/46297 but is not seeing movement
 // so we'll patch here pending a fix in that library
+// @ts-ignore Ignore so that way we can bypass semantic error TS7017: Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.
 globalThis.it.skip = globalThis.xit
 
 @Injectable()
@@ -169,6 +171,21 @@ function bootstrapModule<T> (
   return testModuleMetaData
 }
 
+@Injectable()
+export class CypressTestComponentRenderer extends TestComponentRenderer {
+  override insertRootElement (rootElId: string) {
+    this.removeAllRootElements()
+
+    const rootElement = getContainerEl()
+
+    rootElement.setAttribute('id', rootElId)
+  }
+
+  override removeAllRootElements () {
+    getContainerEl().innerHTML = ''
+  }
+}
+
 /**
  * Initializes the TestBed
  *
@@ -185,6 +202,8 @@ function initTestBed<T> (
   getTestBed().configureTestingModule({
     ...bootstrapModule(componentFixture, config),
   })
+
+  getTestBed().overrideProvider(TestComponentRenderer, { useValue: new CypressTestComponentRenderer() })
 
   return componentFixture
 }
@@ -350,7 +369,7 @@ export function mount<T> (
  * import { mount, createOutputSpy } from '@cypress/angular'
  *
  * it('Has spy', () => {
- *   mount(StepperComponent, { change: createOutputSpy('changeSpy') })
+ *   mount(StepperComponent, { componentProperties: { change: createOutputSpy('changeSpy') } })
  *   cy.get('[data-cy=increment]').click()
  *   cy.get('@changeSpy').should('have.been.called')
  * })

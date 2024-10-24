@@ -1,0 +1,51 @@
+{
+  "targetDefaults": {
+    "lint": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.eslintrc.js"
+      ],
+      "cache": false
+    },
+    "check-ts": {
+      "inputs": [
+        "default",
+        "sharedGlobals"
+      ],
+      "cache": false
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "cache": false
+    },
+    "build-prod": {
+      "dependsOn": [
+        "^build-prod"
+      ],
+      "cache": false
+    }
+  },
+  "namedInputs": {
+    "sharedGlobals": [
+      "{workspaceRoot}/scripts"
+    ],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals",
+      "{workspaceRoot}/.circleci/cache-version.txt"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/*.spec.ts",
+      "!{projectRoot}/**/*.md",
+      "!{projectRoot}/tsconfig.spec.json",
+      "!{projectRoot}/.eslintrc.json",
+      "!{projectRoot}/.mocharc.{js,json}",
+      "!{projectRoot/cypress.config.{ts,js}",
+      "!{projectRoot/**/*.cy.ts"
+    ]
+  },
+  "nxCloudAccessToken": "ZmNlNjA0YzAtNTM1NS00MDIwLWFlMWItNWYxYzNiMjQ4N2VkfHJlYWQtb25seQ=="
+}

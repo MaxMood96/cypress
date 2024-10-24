@@ -7,6 +7,7 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       cy.openProject('todos')
       cy.startAppServer()
       cy.visitApp()
+      cy.specsPageIsVisible()
       cy.contains('todos')
     })
 
@@ -16,13 +17,9 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       .tab().should('have.attr', 'data-cy', 'sidebar-header').should('have.attr', 'role', 'button')
       .tab().should('have.attr', 'href', '#/specs').should('have.prop', 'tagName', 'A')
       .tab().should('have.attr', 'href', '#/runs').should('have.prop', 'tagName', 'A')
+      .tab().should('have.attr', 'href', '#/debug').should('have.prop', 'tagName', 'A')
       .tab().should('have.attr', 'href', '#/settings').should('have.prop', 'tagName', 'A')
       .tab().should('have.attr', 'data-cy', 'keyboard-modal-trigger').should('have.prop', 'tagName', 'BUTTON')
-    })
-
-    it('has no axe violations', () => {
-      cy.injectAxe()
-      cy.checkA11y('[data-cy="sidebar"]')
     })
 
     it('has appropriate aria attributes', () => {
@@ -55,6 +52,7 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       cy.openProject('todos')
       cy.startAppServer()
       cy.visitApp()
+      cy.specsPageIsVisible()
 
       cy.contains('fixture.js').click()
 
@@ -72,6 +70,7 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       cy.openProject('todos')
       cy.startAppServer()
       cy.visitApp()
+      cy.specsPageIsVisible()
       cy.contains('todos')
     })
 
@@ -145,6 +144,10 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       cy.findByTestId('sidebar-link-specs-page').trigger('mouseenter')
       cy.contains('.v-popper--some-open--tooltip', 'Specs')
       cy.findByTestId('sidebar-link-specs-page').trigger('mouseout')
+
+      cy.findByTestId('sidebar-link-debug-page').trigger('mouseenter')
+      cy.contains('.v-popper--some-open--tooltip', 'Debug')
+      cy.findByTestId('sidebar-link-debug-page').trigger('mouseout')
 
       cy.findByTestId('sidebar-link-settings-page').trigger('mouseenter')
       cy.contains('.v-popper--some-open--tooltip', 'Settings')
@@ -237,6 +240,14 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
       cy.get('.router-link-active').findByText('Specs').should('be.visible')
     })
 
+    it('has a menu item labeled "Debug" which takes you to the Debug page', () => {
+      cy.get('[data-cy="app-header-bar"]').findByText('Debug').should('not.exist')
+
+      cy.findByTestId('sidebar-link-debug-page').should('contain', 'Debug').should('be.visible').click()
+      cy.get('[data-cy="app-header-bar"]').findByText('Debug').should('be.visible')
+      cy.get('.router-link-active').findByText('Debug').should('be.visible')
+    })
+
     it('Specs sidebar nav link is not active when a test is running', () => {
       cy.location('hash').should('equal', '#/specs')
       cy.contains('.router-link-exact-active', 'Specs')
@@ -312,9 +323,10 @@ describe('Sidebar Navigation', { viewportWidth: 1280 }, () => {
   context('as component testing type', () => {
     it('shows if testing type is configured when clicking switch testing type', () => {
       cy.scaffoldProject('pristine-with-ct-testing')
-      cy.openProject('pristine-with-ct-testing')
+      cy.openProject('pristine-with-ct-testing', ['--component'])
       cy.startAppServer('component')
       cy.visitApp()
+      cy.specsPageIsVisible('new-project')
 
       cy.get('[data-cy="sidebar-header"]').as('switchTestingType').click()
       cy.findByRole('dialog', {

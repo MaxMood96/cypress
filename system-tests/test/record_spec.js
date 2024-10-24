@@ -1,32 +1,48 @@
+/* eslint-disable no-console */
 const _ = require('lodash')
 const path = require('path')
 const Promise = require('bluebird')
-const jsonSchemas = require('@cypress/json-schemas').api
+const dedent = require('dedent')
+
 const systemTests = require('../lib/system-tests').default
 const { fs } = require('@packages/server/lib/util/fs')
+const { promises: fsPromise } = require('fs')
+const os = require('os')
+
 const Fixtures = require('../lib/fixtures')
+const { assertSchema } = require('../lib/validations/cloudValidations')
 const {
   createRoutes,
   setupStubbedServer,
-  getRequestUrls, getRequests,
+  enableCaptureProtocol,
+  getRequestUrls,
+  getRequests,
   postRunResponse,
   postRunResponseWithWarnings,
   postRunInstanceResponse,
   postInstanceTestsResponse,
+  encryptBody,
+  disableCaptureProtocolWithMessage,
+  disableCaptureProtocolUploadUrl,
+  CAPTURE_PROTOCOL_UPLOAD_URL,
+  postRunResponseWithProtocolDisabled,
+  routeHandlers,
+  enableInvalidProtocolSignature,
 } = require('../lib/serverStub')
 const { expectRunsToHaveCorrectTimings } = require('../lib/resultsUtils')
-
+const { randomBytes } = require('crypto')
+const { PROTOCOL_STUB_CONSTRUCTOR_ERROR, PROTOCOL_STUB_NONFATAL_ERROR, PROTOCOL_STUB_BEFORESPEC_ERROR, PROTOCOL_STUB_BEFORETEST_ERROR, PROTOCOL_STUB_NO_DB_WRITE } = require('../lib/protocol-stubs/protocolStubResponse')
+const debug = require('debug')('cypress:system-tests:record_spec')
 const e2ePath = Fixtures.projectPath('e2e')
 const outputPath = path.join(e2ePath, 'output.json')
 
 let { runId, groupId, machineId, runUrl, tags } = postRunResponse
 const { instanceId } = postRunInstanceResponse
 
-let requests = null
-
 describe('e2e record', () => {
   beforeEach(() => {
-    requests = getRequests()
+    // uploads happen too fast to be captured by these tests without tuning these values
+    process.env.CYPRESS_UPLOAD_ACTIVITY_INTERVAL = 100
   })
 
   context('passing', () => {
@@ -35,13 +51,15 @@ describe('e2e record', () => {
     it('passes', async function () {
       const { stdout } = await systemTests.exec(this, {
         key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
-        configFile: 'cypress-with-project-id.config.js',
+        configFile: 'cypress-with-project-id-and-no-upload-on-pass-event.config.js',
         spec: 'record*',
         record: true,
         snapshot: true,
         outputPath,
         expectedExitCode: 3,
         config: {
+          video: true,
+          videoCompression: 32,
           env: {
             'TEST_STDIO': '1',
           },
@@ -53,8 +71,9 @@ describe('e2e record', () => {
       expect(stdout).to.include(runUrl)
 
       const urls = getRequestUrls()
+      const requests = getRequests()
 
-      const instanceReqs = urls.slice(0, 22)
+      const instanceReqs = urls.slice(0, 26)
 
       expect(instanceReqs).to.deep.eq([
         // first create run request
@@ -65,6 +84,7 @@ describe('e2e record', () => {
         // no instances/:id/tests because spec failed during eval
         `POST /instances/${instanceId}/results`,
         'PUT /videos/video.mp4',
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
 
         // spec 2
@@ -73,6 +93,7 @@ describe('e2e record', () => {
         `POST /instances/${instanceId}/results`,
         'PUT /videos/video.mp4',
         'PUT /screenshots/1.png',
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
 
         // spec 3
@@ -81,6 +102,7 @@ describe('e2e record', () => {
         `POST /instances/${instanceId}/results`,
         // no video because no tests failed
         'PUT /screenshots/1.png',
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
 
         // spec 4
@@ -89,6 +111,7 @@ describe('e2e record', () => {
         `POST /instances/${instanceId}/results`,
         'PUT /videos/video.mp4',
         'PUT /screenshots/1.png',
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
       ])
 
@@ -123,23 +146,23 @@ describe('e2e record', () => {
       expect(firstInstancePostResults.body.stats.failures).to.eq(1)
       expect(firstInstancePostResults.body.stats.passes).to.eq(0)
 
-      const firstInstanceStdout = requests[4]
+      const firstInstanceStdout = requests[5]
 
       expect(firstInstanceStdout.body.stdout).to.include('record_error.cy.js')
 
-      const secondInstance = requests[5]
+      const secondInstance = requests[6]
 
       expect(secondInstance.body.groupId).to.eq(groupId)
       expect(secondInstance.body.machineId).to.eq(machineId)
       expect(secondInstance.body.spec).to.eq(null)
 
-      const secondInstancePostTests = requests[6].body
+      const secondInstancePostTests = requests[7].body
 
       expect(secondInstancePostTests.tests).length(2)
       expect(secondInstancePostTests.hooks).length(1)
       expect(secondInstancePostTests.config).is.an('object')
 
-      const secondInstancePostResults = requests[7]
+      const secondInstancePostResults = requests[8]
 
       expect(secondInstancePostResults.body.exception).to.be.null
       expect(secondInstancePostResults.body.tests).to.have.length(2)
@@ -151,25 +174,25 @@ describe('e2e record', () => {
       expect(secondInstancePostResults.body.hooks).not.exist
       expect(secondInstancePostResults.body.cypressConfig).not.exist
 
-      const secondInstanceStdout = requests[10]
+      const secondInstanceStdout = requests[12]
 
       expect(secondInstanceStdout.body.stdout).to.include('record_fail.cy.js')
       expect(secondInstanceStdout.body.stdout).not.to.include('record_error.cy.js')
 
-      const thirdInstance = requests[11]
+      const thirdInstance = requests[13]
 
       expect(thirdInstance.body.groupId).to.eq(groupId)
       expect(thirdInstance.body.machineId).to.eq(machineId)
       expect(thirdInstance.body.spec).to.eq(null)
 
-      const thirdInstancePostTests = requests[12].body
+      const thirdInstancePostTests = requests[14].body
 
       expect(thirdInstancePostTests.tests[0].config.env.foo).eq(true)
       expect(thirdInstancePostTests.tests).length(2)
       expect(thirdInstancePostTests.hooks).length(0)
       expect(thirdInstancePostTests.config).is.an('object')
 
-      const thirdInstancePostResults = requests[13]
+      const thirdInstancePostResults = requests[15]
 
       expect(thirdInstancePostResults.body.exception).to.be.null
       expect(thirdInstancePostResults.body.tests).to.have.length(2)
@@ -179,7 +202,7 @@ describe('e2e record', () => {
       expect(thirdInstancePostResults.body.stats.failures).to.eq(0)
       expect(thirdInstancePostResults.body.stats.pending).to.eq(1)
 
-      const thirdInstanceStdout = requests[15]
+      const thirdInstanceStdout = requests[18]
 
       console.log('13')
 
@@ -189,7 +212,7 @@ describe('e2e record', () => {
       expect(thirdInstanceStdout.body.stdout).to.include('plugin stdout')
       expect(thirdInstanceStdout.body.stdout).to.not.include('plugin stderr')
 
-      const fourthInstance = requests[16]
+      const fourthInstance = requests[19]
 
       console.log('14')
 
@@ -197,7 +220,7 @@ describe('e2e record', () => {
       expect(fourthInstance.body.machineId).to.eq(machineId)
       expect(fourthInstance.body.spec).to.eq(null)
 
-      const fourthInstancePostResults = requests[18]
+      const fourthInstancePostResults = requests[21]
 
       console.log('15')
 
@@ -208,7 +231,7 @@ describe('e2e record', () => {
       expect(fourthInstancePostResults.body.stats.failures).to.eq(1)
       expect(fourthInstancePostResults.body.stats.passes).to.eq(0)
 
-      const forthInstanceStdout = requests[21]
+      const forthInstanceStdout = requests[25]
 
       console.log('18')
 
@@ -318,7 +341,7 @@ describe('e2e record', () => {
             resp.claimedInstances = claimed.length
             resp.totalInstances = allSpecs.length
 
-            jsonSchemas.assertSchema('postRunInstanceResponse', '2.1.0')(resp)
+            assertSchema('createInstance', 5, 'req')(resp)
 
             return res.json(resp)
           }
@@ -343,7 +366,7 @@ describe('e2e record', () => {
 
     setupStubbedServer(routes)
 
-    // TODO: fix flaky test https://github.com/cypress-io/cypress/issues/23152
+    // TODO: fix failing test https://github.com/cypress-io/cypress/issues/23152
     it.skip('passes in parallel with group', function () {
       this.retries(3)
 
@@ -360,6 +383,8 @@ describe('e2e record', () => {
           ciBuildId: 'ciBuildId123',
           expectedExitCode: 3,
           config: {
+            video: true,
+            videoCompression: 32,
             trashAssetsBeforeRuns: false,
           },
         })
@@ -367,6 +392,7 @@ describe('e2e record', () => {
 
         // stagger the 2nd run
         // starting up a bit
+        // NOTE: this is probably why this test flakes - despite waiting 3s, sometimes the second instance finishes first
         Promise
         .delay(3000)
         .then(() => {
@@ -381,6 +407,7 @@ describe('e2e record', () => {
             tag: 'nightly',
             ciBuildId: 'ciBuildId123',
             config: {
+              videoCompression: 32,
               trashAssetsBeforeRuns: false,
             },
           })
@@ -393,7 +420,7 @@ describe('e2e record', () => {
   context('metadata', () => {
     setupStubbedServer(createRoutes())
 
-    // TODO: fix flaky test https://github.com/cypress-io/cypress/issues/23151
+    // TODO: fix failing test https://github.com/cypress-io/cypress/issues/23151
     it.skip('sends Studio usage metadata', function () {
       return systemTests.exec(this, {
         key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
@@ -403,6 +430,7 @@ describe('e2e record', () => {
         snapshot: true,
       })
       .then(() => {
+        const requests = getRequests()
         const postResults = requests[3]
 
         expect(postResults.url).to.eq(`POST /instances/${instanceId}/results`)
@@ -459,13 +487,13 @@ describe('e2e record', () => {
         `POST /runs/${runId}/instances`,
         `POST /instances/${instanceId}/tests`,
         `POST /instances/${instanceId}/results`,
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
-
         `POST /runs/${runId}/instances`,
         `POST /instances/${instanceId}/tests`,
         `POST /instances/${instanceId}/results`,
+        `PUT /instances/${instanceId}/artifacts`,
         `PUT /instances/${instanceId}/stdout`,
-
         `POST /runs/${runId}/instances`,
       ])
     })
@@ -571,6 +599,8 @@ describe('e2e record', () => {
 
       })
 
+      const requests = getRequests()
+
       expect(requests[2].body.config.defaultCommandTimeout).eq(1111)
       expect(requests[2].body.config.resolved.defaultCommandTimeout).deep.eq({
         value: 1111,
@@ -628,7 +658,7 @@ describe('e2e record', () => {
             mockServerState.specs = req.body.specs.slice().reverse()
             console.log(mockServerState.specs)
             mockServerState.allSpecs = req.body.specs
-            res.json(postRunResponse)
+            res.json(postRunResponseWithProtocolDisabled())
           },
         },
       }))
@@ -642,9 +672,11 @@ describe('e2e record', () => {
           snapshot: false,
         })
 
+        const requests = getRequests()
+
         // specs were reordered
         expect(requests[2].body.tests[0].title[1]).eq('b test')
-        expect(requests[6].body.tests[0].title[1]).eq('a test')
+        expect(requests[7].body.tests[0].title[1]).eq('a test')
       })
     })
   })
@@ -660,6 +692,8 @@ describe('e2e record', () => {
               ...postInstanceTestsResponse,
               actions: [{
                 type: 'SPEC',
+                clientId: null,
+                payload: null,
                 action: 'SKIP',
               }],
             })
@@ -684,6 +718,8 @@ describe('e2e record', () => {
         expectedExitCode: 1,
       })
 
+      const requests = getRequests()
+
       expect(getRequestUrls()).deep.eq([
         'POST /runs',
         'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
@@ -691,6 +727,7 @@ describe('e2e record', () => {
         'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
         'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/tests',
         'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/results',
+        'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/artifacts',
         'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/stdout',
         'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
       ])
@@ -698,6 +735,7 @@ describe('e2e record', () => {
       console.log(requests[0].body.runnerCapabilities)
       expect(requests[0].body).property('runnerCapabilities').deep.eq({
         'dynamicSpecsInSerialMode': true,
+        'protocolMountVersion': 2,
         'skipSpecAction': true,
       })
     })
@@ -722,6 +760,7 @@ describe('e2e record', () => {
         'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
         'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/tests',
         'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/results',
+        'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/artifacts',
         'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/stdout',
         'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
       ])
@@ -745,6 +784,7 @@ describe('e2e record', () => {
             },
           },
         })
+        const requests = getRequests()
 
         console.log(stdout)
 
@@ -761,46 +801,6 @@ describe('e2e record', () => {
         const runResults = requests[3]
 
         expect(runResults.body.video).to.be.false
-      })
-    })
-
-    describe('when videoUploadOnPasses=false', () => {
-      setupStubbedServer(createRoutes())
-      it('does not upload when specs pass', async function () {
-        const { stdout } = await systemTests.exec(this, {
-          key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
-          configFile: 'cypress-with-project-id.config.js',
-          spec: 'record_fail*,record_pass*',
-          record: true,
-          snapshot: true,
-          expectedExitCode: 1,
-          config: {
-            env: {
-              'TEST_STDIO': '1',
-            },
-          },
-        })
-
-        console.log(stdout)
-
-        expect(stdout).to.include('Run URL:')
-        expect(stdout).to.include(runUrl)
-
-        const postRun = requests[0]
-
-        // ensure its relative to projectRoot
-        expect(postRun.body.specs).to.deep.eq([
-          'cypress/e2e/record_fail.cy.js',
-          'cypress/e2e/record_pass.cy.js',
-        ])
-
-        const recordFailSpecResults = requests[3]
-
-        expect(recordFailSpecResults.body.video).to.be.true // failed spec has video
-
-        const recordPassSpecResults = requests[9]
-
-        expect(recordPassSpecResults.body.video).to.be.false // passing spec does not have video
       })
     })
   })
@@ -1046,7 +1046,7 @@ describe('e2e record', () => {
               code: 'RUN_GROUP_NAME_NOT_UNIQUE',
               message: 'Run group name cannot be used again without passing the parallel flag.',
               payload: {
-                runUrl: 'https://dashboard.cypress.io/runs/12345',
+                runUrl: 'https://cloud.cypress.io/runs/12345',
               },
             })
           },
@@ -1079,7 +1079,8 @@ describe('e2e record', () => {
     describe('create run 412', () => {
       setupStubbedServer(createRoutes({
         postRun: {
-          reqSchema: 'postRunRequest@2.0.0', // force this to throw a schema error
+          reqSchema: ['createRun', 4],
+          // force this to throw a schema error
           onReqBody (body) {
             _.extend(body, {
               ci: null,
@@ -1257,7 +1258,32 @@ describe('e2e record', () => {
         },
       } }))
 
-      it('errors and exits when there\'s an unknown 402 error', function () {
+      it(`errors and exits when there's an unknown 402 error`, function () {
+        return systemTests.exec(this, {
+          key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+          configFile: 'cypress-with-project-id.config.js',
+          spec: 'record_pass*',
+          record: true,
+          snapshot: true,
+          expectedExitCode: 1,
+        })
+      })
+    })
+
+    describe('create run 402 - auto cancel not available in plan', () => {
+      setupStubbedServer(createRoutes({
+        postRun: {
+          res (req, res) {
+            return res.status(402).json({
+              code: 'AUTO_CANCEL_NOT_AVAILABLE_IN_PLAN',
+              payload: {
+                orgId: 'org-id-1234',
+              },
+            })
+          },
+        } }))
+
+      it('errors and exits when auto cancel not available in plan', function () {
         return systemTests.exec(this, {
           key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
           configFile: 'cypress-with-project-id.config.js',
@@ -1314,7 +1340,7 @@ describe('e2e record', () => {
 
       //   return systemTests.exec(this, {
       //     key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
-      'cypress-with-project-id.config.js',
+      //     configFile: 'cypress-with-project-id.config.js',
       //     spec: '*_record.spec*',
       //     record: true,
       //     snapshot: true,
@@ -1447,6 +1473,7 @@ describe('e2e record', () => {
             `POST /instances/${instanceId}/tests`,
             `POST /instances/${instanceId}/results`,
             'PUT /screenshots/1.png',
+            `PUT /instances/${instanceId}/artifacts`,
             `PUT /instances/${instanceId}/stdout`,
             `POST /runs/${runId}/instances`,
           ])
@@ -1481,18 +1508,61 @@ describe('e2e record', () => {
           spec: 'record_pass*',
           record: true,
           snapshot: true,
+          config: {
+            video: true,
+          },
         })
         .then(() => {
           const urls = getRequestUrls()
 
-          expect(urls).to.have.members([
+          expect(urls).to.deep.eq([
             'POST /runs',
             `POST /runs/${runId}/instances`,
             `POST /instances/${instanceId}/tests`,
             `POST /instances/${instanceId}/results`,
-            'PUT /videos/video.mp4',
             'PUT /screenshots/1.png',
+            'PUT /videos/video.mp4',
+            `PUT /instances/${instanceId}/artifacts`,
             `PUT /instances/${instanceId}/stdout`,
+            `POST /runs/${runId}/instances`,
+          ])
+        })
+      })
+    })
+
+    describe('update instance artifacts', () => {
+      const routes = createRoutes({
+        putArtifacts: {
+          res (_, res) {
+            return res.sendStatus(500)
+          },
+        },
+      })
+
+      setupStubbedServer(routes)
+
+      it('warns but proceeds', function () {
+        process.env.DISABLE_API_RETRIES = 'true'
+
+        return systemTests.exec(this, {
+          key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+          configFile: 'cypress-with-project-id.config.js',
+          spec: 'record_pass*',
+          record: true,
+          snapshot: true,
+        })
+        .then(() => {
+          const urls = getRequestUrls()
+
+          expect(urls).to.deep.eq([
+            'POST /runs',
+            `POST /runs/${runId}/instances`,
+            `POST /instances/${instanceId}/tests`,
+            `POST /instances/${instanceId}/results`,
+            'PUT /screenshots/1.png',
+            `PUT /instances/${instanceId}/artifacts`,
+            `PUT /instances/${instanceId}/stdout`,
+            `POST /runs/${runId}/instances`,
           ])
         })
       })
@@ -1507,7 +1577,7 @@ describe('e2e record', () => {
             count += 1
 
             if (count === 4) {
-              return res.json(postRunResponse)
+              return res.json(postRunResponseWithProtocolDisabled())
             }
 
             return res.sendStatus(500)
@@ -1572,9 +1642,379 @@ describe('e2e record', () => {
             'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/tests',
             'POST /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/results',
             'PUT /screenshots/1.png',
+            'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/artifacts',
             'PUT /instances/e9e81b5e-cc58-4026-b2ff-8ae3161435a6/stdout',
             'POST /runs/00748421-e035-4a3d-8604-8468cc48bdb5/instances',
           ])
+        })
+      })
+    })
+
+    describe('sendPreflight', () => {
+      describe('[F1] socket errors', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return req.socket.destroy(new Error('killed'))
+            },
+          },
+        }))
+
+        it('fails after retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F1] 500 status code errors with empty body', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res.sendStatus(500)
+            },
+          },
+        }))
+
+        it('fails after retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F1] 500 status code errors with body', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res
+              .status(500)
+              .json({ message: 'an error message' })
+            },
+          },
+        }))
+
+        it('fails after retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F2] 404 status code with JSON body', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res
+              .status(404)
+              .json({ message: 'not found' })
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F2] 404 status code with empty body', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res.sendStatus(404)
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F3] 422 status code with invalid decryption', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res: async (req, res) => {
+              return res.status(422).json({
+                message: 'something broke',
+              })
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F3] 201 status code with invalid decryption', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res
+              .status(201)
+              .json({ data: 'very encrypted and secure string' })
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F3] 200 status code with empty body', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res (req, res) {
+              return res.sendStatus(200)
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F4] 412 status code with valid decryption', () => {
+        setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res: async (req, res) => {
+              return res.status(412).json(await encryptBody(req, res, {
+                message: 'Recording is not working',
+                errors: [
+                  'attempted to send invalid data',
+                ],
+                object: {
+                  projectId: 'cy12345',
+                },
+              }))
+            },
+          },
+        }))
+
+        it('fails without retrying', function () {
+          process.env.API_RETRY_INTERVALS = '1000'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+            expectedExitCode: 1,
+          })
+        })
+      })
+
+      describe('[F5] 422 status code with valid decryption on createRun', async () => {
+        const mockServer = setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res: async (req, res) => {
+              return res.json(await encryptBody(req, res, {
+                encrypt: true,
+                apiUrl: req.body.apiUrl,
+              }))
+            },
+          },
+          postRun: {
+            res: async (req, res) => {
+              mockServer.setSpecs(req)
+
+              return res
+              .set({ 'x-cypress-encrypted': true })
+              .status(422)
+              .json(await encryptBody(req, res, {
+                code: 'RUN_GROUP_NAME_NOT_UNIQUE',
+                message: 'Run group name cannot be used again without passing the parallel flag.',
+                payload: {
+                  runUrl: 'https://cloud.cypress.io/runs/12345',
+                },
+              }))
+            },
+          },
+        }))
+
+        // the other 422 tests for this are in integration/cypress_spec
+        it('errors and exits when group name is in use', function () {
+          process.env.CIRCLECI = '1'
+
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'e2e-tests',
+            record: true,
+            snapshot: true,
+            expectedExitCode: 1,
+          })
+          .then(() => {
+            const urls = getRequestUrls()
+
+            expect(urls).to.deep.eq([
+              'POST /runs',
+            ])
+          })
+        })
+      })
+
+      describe('[W1] warning message', () => {
+        const mockServer = setupStubbedServer(createRoutes({
+          sendPreflight: {
+            res: async (req, res) => {
+              return res.json(await encryptBody(req, res, {
+                encrypt: true,
+                apiUrl: req.body.apiUrl,
+                warnings: [
+                  {
+                    message: dedent`
+                    ----------------------------------------------------------------------
+                    This feature will not be supported soon, please check with Cypress to learn more: https://on.cypress.io/
+                    ----------------------------------------------------------------------
+                  `,
+                  },
+                ],
+              }))
+            },
+          },
+          postRun: {
+            res (req, res) {
+              mockServer.setSpecs(req)
+
+              return res.status(200).json({
+                runId,
+                groupId,
+                machineId,
+                runUrl,
+                tags,
+                warnings: [{
+                  name: 'foo',
+                  message: 'foo',
+                  code: 'FREE_PLAN_IN_GRACE_PERIOD_EXCEEDS_MONTHLY_PRIVATE_TESTS',
+                  limit: 500,
+                  gracePeriodEnds: '2999-12-31',
+                  orgId: 'org-id-1234',
+                }],
+              })
+            },
+          },
+        }))
+
+        it('renders preflight warning messages prior to run warnings', async function () {
+          return await systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            group: 'foo',
+            tag: 'nightly',
+            record: true,
+            parallel: true,
+            snapshot: true,
+            ciBuildId: 'ciBuildId123',
+          })
         })
       })
     })
@@ -1811,7 +2251,7 @@ describe('e2e record', () => {
                 tags,
                 warnings: [{
                   name: 'FreePlanExceedsMonthlyTests',
-                  message: 'Warning from Cypress Dashboard: Organization with free plan has exceeded monthly test results limit.',
+                  message: 'Warning from Cypress Cloud: Organization with free plan has exceeded monthly test results limit.',
                   code: 'FREE_PLAN_EXCEEDS_MONTHLY_TESTS_V2',
                   used: 700,
                   limit: 500,
@@ -1838,7 +2278,7 @@ describe('e2e record', () => {
           postRun: {
             res: (req, res) => {
               mockServer.setSpecs(req)
-              res.json(postRunResponseWithWarnings)
+              res.json(postRunResponseWithProtocolDisabled(postRunResponseWithWarnings))
             },
           },
         }))
@@ -1850,8 +2290,558 @@ describe('e2e record', () => {
             spec: 'record_pass*',
             record: true,
             snapshot: true,
+          }).then(() => {
+            const urls = getRequestUrls()
+
+            expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+
+            const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`).body
+
+            debug(artifactReport)
           })
         })
+      })
+    })
+  })
+
+  describe('capture-protocol', () => {
+    setupStubbedServer(createRoutes())
+
+    describe('disabled messaging', () => {
+      disableCaptureProtocolWithMessage('Test Replay is only supported in Chromium browsers')
+
+      it('displays disabled message but continues', function () {
+        return systemTests.exec(this, {
+          key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+          configFile: 'cypress-with-project-id.config.js',
+          spec: 'record_pass*',
+          record: true,
+          snapshot: true,
+        })
+      })
+    })
+
+    describe('enabled', () => {
+      let archiveFile = ''
+
+      beforeEach(async () => {
+        const dbPath = path.join(os.tmpdir(), 'cypress', 'protocol')
+
+        archiveFile = path.join(dbPath, `${instanceId}.tar`)
+
+        await fsPromise.mkdir(dbPath, { recursive: true })
+
+        debug('writing archive to', archiveFile)
+
+        return fsPromise.writeFile(archiveFile, randomBytes(128))
+      })
+
+      describe('passing', () => {
+        enableCaptureProtocol()
+        it('retrieves the capture protocol, uploads the db, and updates the artifact upload report', function () {
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            spec: 'record_pass*',
+            record: true,
+            snapshot: true,
+          }).then((ret) => {
+            const urls = getRequestUrls()
+            const artifactReport = getRequests().find(({ url }) => url.includes(`/instances/${instanceId}/artifacts`))?.body
+
+            expect(urls).to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+            expect(artifactReport?.protocol).to.an('object')
+            expect(artifactReport?.protocol?.url).to.be.a('string')
+            expect(artifactReport?.protocol?.uploadDuration).to.be.a('number')
+            expect(artifactReport?.protocol).to.containSubset({
+              afterSpecDurations: {
+                drainCDPEvents: 1,
+                drainAUTEvents: 5,
+                resolveBodyPromises: 7,
+                closeDb: 11,
+                teardownBindings: 13,
+              },
+            })
+
+            expect(artifactReport?.protocol?.afterSpecDurations?.afterSpecTotal).to.be.a('number')
+          })
+        })
+      })
+
+      describe('when capture protocol script returns with an invalid signature', () => {
+        enableCaptureProtocol()
+        enableInvalidProtocolSignature()
+
+        it('displays an appropriate error message', function () {
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            browser: 'chrome',
+            spec: 'record_pass*',
+            record: true,
+            snapshot: true,
+            expectedExitCode: 0,
+          })
+        })
+      })
+
+      describe('when the tab crashes in chrome', () => {
+        enableCaptureProtocol()
+        it('posts accurate test results', function () {
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            configFile: 'cypress-with-project-id.config.js',
+            browser: 'chrome',
+            spec: 'chrome_tab_crash*,record_pass*',
+            record: true,
+            snapshot: true,
+            expectedExitCode: 1,
+          }).then(() => {
+            const requests = getRequests()
+            const postResultsRequest = requests.find((r) => r.url === `POST /instances/${instanceId}/results`)
+
+            expect(postResultsRequest.body.exception).to.include('Chrome Renderer process just crashed')
+            expect(postResultsRequest.body.tests).to.have.length(2)
+            expect(postResultsRequest.body.stats.suites).to.equal(1)
+            expect(postResultsRequest.body.stats.tests).to.equal(2)
+            expect(postResultsRequest.body.stats.passes).to.equal(1)
+            expect(postResultsRequest.body.stats.failures).to.equal(1)
+            expect(postResultsRequest.body.stats.skipped).to.equal(0)
+          })
+        })
+      })
+
+      describe('when there is an async error thrown from config file', () => {
+        enableCaptureProtocol()
+        it('posts accurate test results', function () {
+          return systemTests.exec(this, {
+            key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+            browser: 'chrome',
+            project: 'config-with-crashing-plugin',
+            spec: 'simple_multiple.cy.js',
+            configFile: 'cypress-with-project-id.config.js',
+            record: true,
+            snapshot: false,
+            expectedExitCode: 1,
+          }).then(() => {
+            const requests = getRequests()
+            const postResultsRequest = requests.find((r) => r.url === `POST /instances/${instanceId}/results`)
+
+            expect(postResultsRequest?.body.exception).to.include('Your configFile threw an error')
+          })
+        })
+      })
+
+      describe('protocol runtime errors', () => {
+        enableCaptureProtocol()
+        describe('db size too large', () => {
+          beforeEach(() => {
+            return fsPromise.writeFile(archiveFile, randomBytes(1024))
+          })
+
+          afterEach(async () => {
+            if (fs.existsSync(archiveFile)) {
+              return fsPromise.rm(archiveFile)
+            }
+          })
+
+          it('displays error and does not upload if db size is too large', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const urls = getRequestUrls()
+
+              expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+              expect(urls).not.to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+              const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+              expect(artifactReport?.protocol).to.exist()
+              expect(artifactReport?.protocol?.error).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.url).to.exist().and.not.be.empty()
+            })
+          })
+        })
+
+        describe('db is unreadable', () => {
+          enableCaptureProtocol(PROTOCOL_STUB_NO_DB_WRITE)
+          beforeEach(() => {
+            if (fs.existsSync(archiveFile)) {
+              return fsPromise.rm(archiveFile)
+            }
+          })
+
+          it('displays warning and continues', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const urls = getRequestUrls()
+
+              expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+              expect(urls).not.to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+              const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+              expect(artifactReport?.protocol).to.exist()
+              expect(artifactReport?.protocol?.error).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.url).to.exist().and.not.be.empty()
+            })
+          })
+        })
+
+        describe('error initializing protocol', () => {
+          enableCaptureProtocol(PROTOCOL_STUB_CONSTRUCTOR_ERROR)
+
+          it('displays the error and reports the fatal error to cloud via artifacts', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const urls = getRequestUrls()
+
+              expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+              expect(urls).not.to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+              const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+              expect(artifactReport?.protocol).to.exist()
+              expect(artifactReport?.protocol?.error).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.url).to.exist().and.not.be.empty()
+            })
+          })
+        })
+
+        describe('error in protocol beforeSpec', () => {
+          enableCaptureProtocol(PROTOCOL_STUB_BEFORESPEC_ERROR)
+
+          it('displays the error and reports the fatal error to the cloud via artifacts', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const urls = getRequestUrls()
+
+              expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+              expect(urls).not.to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+              const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+              expect(artifactReport?.protocol).to.exist()
+              expect(artifactReport?.protocol?.error).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.url).to.exist().and.not.be.empty()
+            })
+          })
+        })
+
+        describe('error in protocol beforeTest', () => {
+          enableCaptureProtocol(PROTOCOL_STUB_BEFORETEST_ERROR)
+
+          it('displays the error and reports the fatal error to the cloud via artifacts', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const urls = getRequestUrls()
+
+              expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+              expect(urls).not.to.include.members([`PUT ${CAPTURE_PROTOCOL_UPLOAD_URL}`])
+
+              const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+              expect(artifactReport?.protocol).to.exist()
+              expect(artifactReport?.protocol?.error).to.exist().and.not.to.be.empty()
+              expect(artifactReport?.protocol?.url).to.exist().and.not.be.empty()
+            })
+          })
+        })
+
+        describe('non-fatal error encountered during protocol capture', () => {
+          enableCaptureProtocol(PROTOCOL_STUB_NONFATAL_ERROR)
+
+          it('reports the error to the protocol error endpoint', function () {
+            return systemTests.exec(this, {
+              key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+              configFile: 'cypress-with-project-id.config.js',
+              spec: 'record_pass*',
+              record: true,
+              snapshot: true,
+            }).then(() => {
+              const reportErrorUrl = 'POST /capture-protocol/errors'
+              const urls = getRequestUrls()
+
+              debug(urls)
+              expect(urls).to.include.members([reportErrorUrl])
+
+              const errorReport = getRequests().find(({ url }) => url === reportErrorUrl).body
+
+              debug(errorReport)
+              expect(errorReport.errors).to.be.length(4)
+
+              errorReport.errors.forEach((e) => {
+                expect(e.captureMethod).to.eq('commandLogAdded')
+                expect(e.runnableId).to.eq('r3')
+              })
+
+              expect(errorReport.context.specName).to.eq('cypress/e2e/record_pass.cy.js')
+              expect(errorReport.context.projectSlug).to.eq('pid123')
+              expect(errorReport.context.osName).to.eq(os.platform())
+            })
+          })
+        })
+      })
+    })
+  })
+
+  describe('capture-protocol enabled but missing upload url', () => {
+    enableCaptureProtocol()
+    setupStubbedServer(createRoutes({
+      postInstanceResults: {
+        res: (req, res) => {
+          res.status(200).json({
+            screenshotUploadUrls: [],
+            videoUploadUrl: undefined,
+            captureUloadUrl: undefined,
+          })
+        },
+      },
+    }))
+
+    it('Does not try to upload the protocol artifact to the capture protocol script url', function () {
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      }).then(() => {
+        const requestUrls = getRequestUrls()
+
+        expect(requestUrls.find((url) => url.includes('PUT /capture-protocol/script/'))).to.be.undefined
+      })
+    })
+  })
+})
+
+describe('capture-protocol api errors', () => {
+  beforeEach(() => {
+    // uploads happen too fast to be captured by these tests without tuning these values
+    process.env.CYPRESS_UPLOAD_ACTIVITY_INTERVAL = 100
+  })
+
+  enableCaptureProtocol()
+
+  const stubbedServerWithErrorOn = (endpoint, numberOfFailuresBeforeSuccess = Number.MAX_SAFE_INTEGER, status = 500, mimeType = 'text/plain', responseBody = '') => {
+    let failures = 0
+
+    return setupStubbedServer(createRoutes({
+      [endpoint]: {
+        res: (req, res) => {
+          if (failures < numberOfFailuresBeforeSuccess) {
+            failures += 1
+            res.set('Content-Type', mimeType)
+            res.status(status).send(responseBody)
+          } else {
+            routeHandlers[endpoint].res(req, res)
+          }
+        },
+      },
+    }))
+  }
+
+  describe('upload 500 - does not retry', () => {
+    stubbedServerWithErrorOn('putCaptureProtocolUpload')
+    it('continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      }).then(() => {
+        const urls = getRequestUrls()
+
+        expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+
+        const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+        expect(artifactReport?.protocol).to.exist()
+        expect(artifactReport?.protocol?.error).to.equal(
+          'Failed to upload Test Replay: http://localhost:1234/capture-protocol/upload/?x-amz-credential=XXXXXXXX&x-amz-signature=XXXXXXXXXXXXX responded with 500 Internal Server Error',
+        )
+      })
+    })
+  })
+
+  describe('upload 503 - tries 3 times and fails', () => {
+    const errorResponseBody = `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Code>ServiceUnavailable</Code>
+  <Message>Service is unable to handle request.</Message>
+  <Resource>/test_replay/archive.tar</Resource> 
+  <RequestId>4442587FB7D0A2F9</RequestId>
+</Error>`
+    const wspTrimmedResponse = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>ServiceUnavailable</Code><Message>Service is unable to handle request.</Message><Resource>/test_replay/archive.tar</Resource><RequestId>4442587FB7D0A2F9</RequestId></Error>`
+    const errorResponseMimeType = 'application/xml'
+
+    stubbedServerWithErrorOn('putCaptureProtocolUpload', Number.MAX_SAFE_INTEGER, 503, errorResponseMimeType, errorResponseBody)
+    it('continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      }).then(() => {
+        const urls = getRequestUrls()
+
+        expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+
+        const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+        expect(artifactReport?.protocol).to.exist()
+
+        const expectedUrl = `http://localhost:1234/capture-protocol/upload/?x-amz-credential=XXXXXXXX&x-amz-signature=XXXXXXXXXXXXX`
+
+        const expectedErrorMessage = `${expectedUrl} responded with 503 Service Unavailable: ${wspTrimmedResponse}`
+
+        expect(artifactReport?.protocol?.error).to.equal(`Failed to upload Test Replay after 3 attempts. Errors: ${[expectedErrorMessage, expectedErrorMessage, expectedErrorMessage].join(', ')}`)
+        expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+      })
+    })
+  })
+
+  describe('upload 400 - does not retry, as 400 is not a retryable error', () => {
+    const errorResponseMimeType = 'application/xml'
+    const errorResponseBody = `<?xml version="1.0" encoding="UTF-8"?>
+    <Error>
+      <Code>RequestTimeTooSkewed</Code>
+      <Message>The difference between the request time and the server's time is too large.</Message>
+      <Resource>/test_replay/archive.tar</Resource> 
+      <RequestId>4442587FB7D0A2F9</RequestId>
+    </Error>`
+
+    stubbedServerWithErrorOn('putCaptureProtocolUpload', 2, 400, errorResponseMimeType, errorResponseBody)
+
+    let archiveFile = ''
+
+    beforeEach(async () => {
+      const dbPath = path.join(os.tmpdir(), 'cypress', 'protocol')
+
+      archiveFile = path.join(dbPath, `${instanceId}.tar`)
+
+      await fsPromise.mkdir(dbPath, { recursive: true })
+
+      return fsPromise.writeFile(archiveFile, randomBytes(128))
+    })
+
+    it('continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      })
+    })
+  })
+
+  describe('upload network error', () => {
+    disableCaptureProtocolUploadUrl()
+    setupStubbedServer(createRoutes())
+
+    it('retries 3 times, warns and continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      }).then(() => {
+        const urls = getRequestUrls()
+
+        expect(urls).to.include.members([`PUT /instances/${instanceId}/artifacts`])
+
+        const artifactReport = getRequests().find(({ url }) => url === `PUT /instances/${instanceId}/artifacts`)?.body
+
+        expect(artifactReport?.protocol).to.exist()
+        expect(artifactReport?.protocol?.error).to.equal(
+          'Failed to upload Test Replay after 3 attempts. Errors: request to http://fake.test/url failed, reason: getaddrinfo ENOTFOUND fake.test, request to http://fake.test/url failed, reason: getaddrinfo ENOTFOUND fake.test, request to http://fake.test/url failed, reason: getaddrinfo ENOTFOUND fake.test',
+        )
+
+        expect(artifactReport?.protocol?.errorStack).to.exist().and.not.to.be.empty()
+      })
+    })
+  })
+
+  describe('fetch script 500', () => {
+    stubbedServerWithErrorOn('getCaptureScript', Infinity, 500, 'text/plain', '500 - Internal Server Error')
+    it('continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
+      })
+    })
+  })
+
+  describe('error report 500', () => {
+    stubbedServerWithErrorOn('postCaptureProtocolErrors')
+
+    let archiveFile = ''
+
+    beforeEach(async () => {
+      const dbPath = path.join(os.tmpdir(), 'cypress', 'protocol')
+
+      archiveFile = path.join(dbPath, `${instanceId}.tar`)
+
+      await fsPromise.mkdir(dbPath, { recursive: true })
+
+      return fsPromise.writeFile(archiveFile, randomBytes(128))
+    })
+
+    it('continues', function () {
+      process.env.API_RETRY_INTERVALS = '1000'
+
+      return systemTests.exec(this, {
+        key: 'f858a2bc-b469-4e48-be67-0876339ee7e1',
+        configFile: 'cypress-with-project-id.config.js',
+        spec: 'record_pass*',
+        record: true,
+        snapshot: true,
       })
     })
   })

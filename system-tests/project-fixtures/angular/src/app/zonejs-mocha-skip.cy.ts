@@ -1,4 +1,4 @@
-import { AppComponent } from './app.component'
+/* eslint-disable @cypress/dev/skip-comment */
 
 // Validating Mocha syntax and behavior of *.skip is still valid after being patched by `zone.js/testing`
 // Github Issue: https://github.com/cypress-io/cypress/issues/23409
@@ -9,7 +9,7 @@ describe('skip', () => {
         it('skipped', () => {})
       })
     })
-    
+
     describe('describe', () => {
       describe.skip('should exist on "describe"', () => {
         it('skipped', () => {})
@@ -37,12 +37,14 @@ describe('skip', () => {
 
   context('02 - validations', () => {
     const verifyWasSkipped = (title: string) => {
-      cy.wrap(Cypress.$(window.top!.document.body)).within(() =>
-        cy
-          .contains(title)
-          .parents('[data-model-state="pending"]')          // Find parent row with class indicating test was skipped
-          .should('be.visible')
-      )
+      cy.wrap(Cypress.$(window.top!.document.body)).within(() => {
+        return cy
+        .contains(title)
+        .parents('[data-model-state="pending"]') // Find parent row with class indicating test was skipped
+        // the size of the reporter might be smaller, resulting in autoscroll in headless,
+        // meaning some of these will not be visible, hence checking for existence
+        .should('exist')
+      })
     }
 
     describe('suite', () => {

@@ -3,7 +3,7 @@
     :title="t('setupWizard.configFiles.title')"
     :description="t('setupWizard.configFiles.description')"
   />
-  <div class="mx-auto max-w-220 py-8">
+  <div class="mx-auto max-w-[55rem] py-8">
     <FileRow
       v-for="file in files"
       :key="file.file.id"
@@ -16,7 +16,7 @@
     <hr class="my-4">
     <div class="flex gap-2">
       <Button
-        size="lg"
+        size="40"
         :disabled="needsChanges"
         @click="completeSetup"
       >
@@ -30,7 +30,7 @@
 import { computed } from 'vue'
 import { gql } from '@urql/core'
 import { useI18n } from '@cy/i18n'
-import Button from '@cy/components/Button.vue'
+import Button from '@cypress-design/vue-button'
 import FileRow from '../components/code/FileRow.vue'
 import LaunchpadHeader from './LaunchpadHeader.vue'
 import type { ScaffoldedFilesFragment } from '../generated/graphql'

@@ -6,18 +6,18 @@
   "scripts": {
     "build": "tsc || echo 'built, with type errors'",
     "postbuild": "node ../../scripts/sync-exported-npm-with-cli.js",
-    "build-prod": "yarn build",
     "check-ts": "tsc --noEmit",
+    "lint": "eslint --ext .js,.ts,.json, .",
     "watch": "tsc -w"
   },
   "dependencies": {},
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-node-resolve": "^11.1.1",
-    "rollup": "^2.38.5",
-    "rollup-plugin-dts": "^4.2.3",
+    "rollup": "3.7.3",
+    "rollup-plugin-dts": "5.0.0",
     "rollup-plugin-typescript2": "^0.29.0",
-    "typescript": "^4.7.4"
+    "typescript": "~5.4.5"
   },
   "files": [
     "dist"
@@ -32,5 +32,15 @@
   "bugs": "https://github.com/cypress-io/cypress/issues/new?template=1-bug-report.md",
   "publishConfig": {
     "access": "public"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "outputs": [
+          "{workspaceRoot}/cli/mount-utils",
+          "{projectRoot}/dist"
+        ]
+      }
+    }
   }
 }

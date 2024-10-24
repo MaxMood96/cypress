@@ -1,5 +1,5 @@
 import debugFn from 'debug'
-import type { ModuleNode, Plugin, ViteDevServer } from 'vite'
+import type { ModuleNode, PluginOption, ViteDevServer } from 'vite-5'
 import type { Vite } from '../getVite'
 import { parse, HTMLElement } from 'node-html-parser'
 import fs from 'fs'
@@ -27,7 +27,7 @@ function getSpecsPathsSet (specs: Spec[]) {
 export const Cypress = (
   options: ViteDevServerConfig,
   vite: Vite,
-): Plugin => {
+): PluginOption => {
   let base = '/'
 
   const projectRoot = options.cypressConfig.projectRoot
@@ -43,6 +43,7 @@ export const Cypress = (
   let loader = fs.readFileSync(INIT_FILEPATH, 'utf8')
 
   devServerEvents.on('dev-server:specs:changed', (specs: Spec[]) => {
+    debug(`dev-server:secs:changed: ${specs.map((spec) => spec.relative)}`)
     specsPathsSet = getSpecsPathsSet(specs)
   })
 
@@ -53,7 +54,7 @@ export const Cypress = (
       base = config.base
     },
     async transformIndexHtml (html) {
-      // it's possibe other plugins have modified the HTML
+      // it's possible other plugins have modified the HTML
       // before we get to. For example vitejs/plugin-react will
       // add a preamble. We do our best to look at the HTML we
       // receive and inject it.
@@ -127,7 +128,7 @@ export const Cypress = (
         if (iterationNumber > HMR_DEPENDENCY_LOOKUP_MAX_ITERATION) {
           debug(`max hmr iteration reached: ${HMR_DEPENDENCY_LOOKUP_MAX_ITERATION}; Rerun will not happen on this file change.`)
 
-          return []
+          return
         }
 
         // as soon as we find one of the specs, we trigger the re-run of tests
@@ -139,7 +140,7 @@ export const Cypress = (
 
             // if we update support we know we have to re-run it all
             // no need to check further
-            return []
+            return
           }
 
           if (mod.file && specsPathsSet.has(mod.file)) {
@@ -156,7 +157,7 @@ export const Cypress = (
         iterationNumber += 1
       }
 
-      return []
+      return
     },
   }
 }

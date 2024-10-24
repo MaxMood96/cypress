@@ -23,8 +23,10 @@ export default class Attempt {
   @observable isActive: boolean | null = null
   @observable routes: Route[] = []
   @observable _state?: TestState | null = null
+  @observable _testOuterStatus?: TestState = undefined
   @observable _invocationCount: number = 0
   @observable invocationDetails?: FileDetails
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   @observable hookCount: { [name in HookName]: number } = {
     'before all': 0,
     'before each': 0,
@@ -107,8 +109,7 @@ export default class Attempt {
   addLog = (props: LogProps) => {
     switch (props.instrument) {
       case 'command': {
-        // @ts-ignore satisfied by CommandProps
-        if (props.sessionInfo) {
+        if ((props as CommandProps).sessionInfo) {
           this._addSession(props as unknown as SessionProps) // add sessionInstrumentPanel details
         }
 
@@ -173,6 +174,10 @@ export default class Attempt {
       this._state = props.state
     }
 
+    if (props._cypressTestStatusInfo?.outerStatus) {
+      this._testOuterStatus = props._cypressTestStatusInfo.outerStatus
+    }
+
     if (props.err) {
       if (this.err) {
         this.err.update(props.err)
@@ -194,9 +199,23 @@ export default class Attempt {
     }
   }
 
-  @action finish (props: UpdatableTestProps) {
+  @action finish (props: UpdatableTestProps, isInteractive: boolean) {
     this.update(props)
     this.isActive = false
+
+    // if the test is not open and we aren't in interactive mode, clear out the attempt details
+    if (!this.test.isOpen && !isInteractive) {
+      this._clear()
+    }
+  }
+
+  _clear () {
+    this.commands = []
+    this.routes = []
+    this.agents = []
+    this.hooks = []
+    this._logs = {}
+    this.sessions = {}
   }
 
   _addAgent (props: AgentProps) {

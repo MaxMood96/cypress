@@ -88,7 +88,7 @@ class HealState {
  * 3. Repeat 2. with updated `handled` Set until no all `entries` have ben
  *    added
  *
- * @param meta module metatdata which contains information about which other
+ * @param meta module metadata which contains information about which other
  * modules a module imports
  *
  * @param entries all modules that we need to handle
@@ -143,7 +143,7 @@ function sortModulesByLeafness (
  * Sorts all modules by leafness and filters out any module that is not part of
  * `deferred` modules.
  *
- * @param meta module metatdata which contains information about which other
+ * @param meta module metadata which contains information about which other
  * modules a module imports
  *
  * @param entries all modules that we need to handle
@@ -221,13 +221,13 @@ function unpathify (keys: Set<string>) {
  * - `norewrite`: modules that should not be rewritten when generating the
  *    snapshot script as
  * - `deferred`: modules that need to be deferred, that is they can not be
- *    initialized during snapshot inialization
+ *    initialized during snapshot initialization
  * - `healthy`: modules that can be fully initialized during snapshot
  *   initialization
  * - `deferredHashFile`: the file use to derive at the current project state
  *    hash, usually the local `yarn.lock`
  * - `deferredHash`: the hash of the `deferredHashFile` at the time that this
- *   metatdata was generated
+ *   metadata was generated
  *
  * The `hash` related properties tell the snapshot doctor for future runs if
  * the metadata can be used as is since the project state didn't change, i.e.
@@ -264,8 +264,10 @@ export class SnapshotDoctor {
   private readonly previousNoRewrite: Set<string>
   private readonly forceNoRewrite: Set<string>
   private readonly nodeEnv: string
+  private readonly cypressInternalEnv: string
   private readonly _scriptProcessor: AsyncScriptProcessor
   private readonly _warningsProcessor: WarningsProcessor
+  private readonly integrityCheckSource: string | undefined
 
   /**
    * Creates an instance of the {@link SnapshotDoctor}
@@ -284,6 +286,8 @@ export class SnapshotDoctor {
     this.previousNoRewrite = unpathify(opts.previousNoRewrite)
     this.forceNoRewrite = unpathify(opts.forceNoRewrite)
     this.nodeEnv = opts.nodeEnv
+    this.cypressInternalEnv = opts.cypressInternalEnv
+    this.integrityCheckSource = opts.integrityCheckSource
   }
 
   /**
@@ -498,7 +502,9 @@ export class SnapshotDoctor {
             entryFilePath: this.entryFilePath,
             entryPoint: `./${key}`,
             nodeEnv: this.nodeEnv,
+            cypressInternalEnv: this.cypressInternalEnv,
             supportTypeScript: this.nodeModulesOnly,
+            integrityCheckSource: this.integrityCheckSource,
           })
 
           assert(result != null, 'expected result from script processor')
@@ -605,6 +611,7 @@ export class SnapshotDoctor {
         deferred: deferredArg,
         norewrite: norewriteArg,
         supportTypeScript: this.nodeModulesOnly,
+        integrityCheckSource: this.integrityCheckSource,
       })
 
       return { warnings, meta: meta as Metadata, bundle }

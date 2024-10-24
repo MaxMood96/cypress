@@ -8,6 +8,7 @@ import path from 'path'
 import sinon, { SinonSpy } from 'sinon'
 import * as errors from '../../src'
 import { convertHtmlToImage } from '../support/utils'
+import os from 'os'
 
 // For importing the files below
 process.env.CYPRESS_INTERNAL_ENV = 'test'
@@ -18,7 +19,7 @@ const isCi = require('is-ci')
 const { terminalBanner } = require('terminal-banner')
 const ciProvider = require('@packages/server/lib/util/ci_provider')
 const browsers = require('@packages/server/lib/browsers')
-const launcherBrowsers = require('@packages/launcher/lib/browsers')
+const { knownBrowsers } = require('@packages/launcher/lib/known-browsers')
 
 const debug = Debug(isCi ? '*' : 'visualSnapshotErrors')
 
@@ -67,6 +68,7 @@ const sanitize = (str: string) => {
   return str
   .split(lineAndColNumsRe).join('')
   .split(cypressRootPath).join('cypress')
+  .split(os.tmpdir()).join('/os/tmpdir')
 }
 
 const snapshotAndTestErrorConsole = async function (errorFileName: string) {
@@ -292,6 +294,11 @@ const makeErr = () => {
   return err as Error & {stack: string}
 }
 
+process.on('uncaughtException', (err) => {
+  console.error(err)
+  process.exit(1)
+})
+
 describe('visual error templates', () => {
   const errorType = (process.env.ERROR_TYPE || '*') as CypressErrorType
 
@@ -325,7 +332,14 @@ describe('visual error templates', () => {
         default: [err],
       }
     },
-    VIDEO_POST_PROCESSING_FAILED: () => {
+    VIDEO_CAPTURE_FAILED: () => {
+      const err = makeErr()
+
+      return {
+        default: [err],
+      }
+    },
+    VIDEO_COMPRESSION_FAILED: () => {
       const err = makeErr()
 
       return {
@@ -339,8 +353,8 @@ describe('visual error templates', () => {
     },
     BROWSER_NOT_FOUND_BY_NAME: () => {
       return {
-        default: ['invalid-browser', browsers.formatBrowsersToOptions(launcherBrowsers.browsers)],
-        canary: ['canary', browsers.formatBrowsersToOptions(launcherBrowsers.browsers)],
+        default: ['invalid-browser', browsers.formatBrowsersToOptions(knownBrowsers)],
+        canary: ['canary', browsers.formatBrowsersToOptions(knownBrowsers)],
       }
     },
     BROWSER_NOT_FOUND_BY_PATH: () => {
@@ -361,31 +375,36 @@ describe('visual error templates', () => {
         retryingAgain: ['Retrying again...'],
       }
     },
+    FIREFOX_CDP_FAILED_TO_CONNECT: () => {
+      return {
+        default: ['Retrying...'],
+      }
+    },
     TESTS_DID_NOT_START_FAILED: () => {
       return {
         default: [],
       }
     },
-    DASHBOARD_CANCEL_SKIPPED_SPEC: () => {
+    CLOUD_CANCEL_SKIPPED_SPEC: () => {
       return {
         default: [],
       }
     },
-    DASHBOARD_API_RESPONSE_FAILED_RETRYING: () => {
+    CLOUD_API_RESPONSE_FAILED_RETRYING: () => {
       return {
         default: [{
           tries: 3,
-          delay: 5000,
+          delayMs: 5000,
           response: makeApiErr(),
         }],
         lastTry: [{
           tries: 1,
-          delay: 5000,
+          delayMs: 5000,
           response: makeApiErr(),
         }],
       }
     },
-    DASHBOARD_CANNOT_PROCEED_IN_PARALLEL: () => {
+    CLOUD_CANNOT_PROCEED_IN_PARALLEL: () => {
       return {
         default: [{
           flags: {
@@ -396,7 +415,7 @@ describe('visual error templates', () => {
         }],
       }
     },
-    DASHBOARD_CANNOT_PROCEED_IN_SERIAL: () => {
+    CLOUD_CANNOT_PROCEED_IN_SERIAL: () => {
       return {
         default: [{
           flags: {
@@ -407,7 +426,7 @@ describe('visual error templates', () => {
         }],
       }
     },
-    DASHBOARD_UNKNOWN_INVALID_REQUEST: () => {
+    CLOUD_UNKNOWN_INVALID_REQUEST: () => {
       return {
         default: [{
           flags: {
@@ -418,7 +437,7 @@ describe('visual error templates', () => {
         }],
       }
     },
-    DASHBOARD_UNKNOWN_CREATE_RUN_WARNING: () => {
+    CLOUD_UNKNOWN_CREATE_RUN_WARNING: () => {
       return {
         default: [{
           props: {
@@ -431,52 +450,52 @@ describe('visual error templates', () => {
         }],
       }
     },
-    DASHBOARD_STALE_RUN: () => {
+    CLOUD_STALE_RUN: () => {
       return {
         default: [{
-          runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
           tag: '123',
           group: 'foo',
           parallel: true,
         }],
       }
     },
-    DASHBOARD_ALREADY_COMPLETE: () => {
+    CLOUD_ALREADY_COMPLETE: () => {
       return {
         default: [{
-          runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
           tag: '123',
           group: 'foo',
           parallel: true,
         }],
       }
     },
-    DASHBOARD_PARALLEL_REQUIRED: () => {
+    CLOUD_PARALLEL_REQUIRED: () => {
       return {
         default: [{
-          runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
           tag: '123',
           group: 'foo',
           parallel: true,
         }],
       }
     },
-    DASHBOARD_PARALLEL_DISALLOWED: () => {
+    CLOUD_PARALLEL_DISALLOWED: () => {
       return {
         default: [{
-          runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
           tag: '123',
           group: 'foo',
           parallel: true,
         }],
       }
     },
-    DASHBOARD_PARALLEL_GROUP_PARAMS_MISMATCH: () => {
+    CLOUD_PARALLEL_GROUP_PARAMS_MISMATCH: () => {
       return {
         default: [
           {
             group: 'foo',
-            runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+            runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
             ciBuildId: 'test-ciBuildId-123',
             parameters: {
               osName: 'darwin',
@@ -487,17 +506,67 @@ describe('visual error templates', () => {
                 'cypress/integration/app_spec.js',
               ],
             },
+            payload: {},
+          },
+        ],
+        differentParams: [
+          {
+            group: 'foo',
+            runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
+            ciBuildId: 'test-ciBuildId-123',
+            parameters: {
+              osName: 'darwin',
+              osVersion: 'v1',
+              browserName: 'Electron',
+              browserVersion: '59.1.2.3',
+              specs: [
+                'cypress/integration/app_spec.js',
+                'cypress/integration/foo_spec.js',
+                'cypress/integration/bar_spec.js',
+              ],
+            },
+            payload: {
+              differentParams: {
+                browserName: {
+                  detected: 'Chrome',
+                  expected: 'Electron',
+                },
+                browserVersion: {
+                  detected: '65',
+                  expected: '64',
+                },
+              },
+              differentSpecs: [
+                'cypress/integration/foo_spec.js',
+              ],
+            },
           },
         ],
       }
     },
-    DASHBOARD_RUN_GROUP_NAME_NOT_UNIQUE: () => {
+    CLOUD_RUN_GROUP_NAME_NOT_UNIQUE: () => {
       return {
         default: [{
-          runUrl: 'https://dashboard.cypress.io/project/abcd/runs/1',
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
           tag: '123',
           group: 'foo',
           parallel: true,
+        }],
+      }
+    },
+    CLOUD_AUTO_CANCEL_NOT_AVAILABLE_IN_PLAN: () => {
+      return {
+        default: [{ link: 'https://on.cypress.io/set-up-billing' }],
+      }
+    },
+    CLOUD_AUTO_CANCEL_MISMATCH: () => {
+      return {
+        default: [{
+          runUrl: 'https://cloud.cypress.io/project/abcd/runs/1',
+          tag: '123',
+          group: 'foo',
+          parallel: true,
+          autoCancelAfterFailures: 3,
         }],
       }
     },
@@ -547,10 +616,10 @@ describe('visual error templates', () => {
         default: ['project-id-123'],
       }
     },
-    DASHBOARD_INVALID_RUN_REQUEST: () => {
+    CLOUD_INVALID_RUN_REQUEST: () => {
       return {
         default: [{
-          message: 'request should follow postRunRequest@2.0.0 schema',
+          message: 'Request Validation Error',
           errors: [
             'data.commit has additional properties',
             'data.ci.buildNumber is required',
@@ -568,26 +637,117 @@ describe('visual error templates', () => {
         default: [],
       }
     },
-    DASHBOARD_CANNOT_UPLOAD_RESULTS: () => {
+    CLOUD_CANNOT_UPLOAD_ARTIFACTS: () => {
       const err = makeApiErr()
 
       return {
         default: [err],
       }
     },
-    DASHBOARD_CANNOT_CREATE_RUN_OR_INSTANCE: () => {
+    CLOUD_CANNOT_CONFIRM_ARTIFACTS: () => {
+      return {
+        default: [makeErr()],
+      }
+    },
+    CLOUD_CANNOT_CREATE_RUN_OR_INSTANCE: () => {
       const err = makeApiErr()
 
       return {
         default: [err],
       }
     },
-    DASHBOARD_RECORD_KEY_NOT_VALID: () => {
+    CLOUD_PROTOCOL_CANNOT_UPLOAD_ARTIFACT: () => {
+      const err = makeErr()
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_INITIALIZATION_FAILURE: () => {
+      const err = makeErr()
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_CAPTURE_FAILURE: () => {
+      const err = makeErr()
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_UPLOAD_HTTP_FAILURE: () => {
+      // @ts-expect-error
+      const err: Error & { status: number, statusText: string, url: string, message: string, responseBody: string } = makeErr()
+
+      err.status = 500
+      err.statusText = 'Internal Server Error'
+      err.url = 'https://some/url'
+      err.responseBody = '{ status: 500, reason: \'unknown\'}'
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_UPLOAD_NETWORK_FAILURE: () => {
+      // @ts-expect-error
+      const err: Error & { url: string } = makeErr()
+
+      err.url = 'https://some/url'
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_UPLOAD_STREAM_STALL_FAILURE: () => {
+      // @ts-expect-error
+      const err: Error & { chunkSizeKB: number, maxActivityDwellTime: number } = new Error('stream stall')
+
+      err.chunkSizeKB = 64
+      err.maxActivityDwellTime = 5000
+
+      return {
+        default: [err],
+      }
+    },
+    CLOUD_PROTOCOL_UPLOAD_AGGREGATE_ERROR: () => {
+      // @ts-expect-error
+      const aggregateError: Error & { errors: any[] } = makeErr()
+      // @ts-expect-error
+      const aggregateErrorWithSystemError: Error & { errors: any[] } = makeErr()
+
+      const errOne = makeErr()
+      const errTwo = makeErr()
+      const errThree = makeErr()
+
+      aggregateError.errors = [errOne, errTwo, errThree]
+
+      // @ts-expect-error
+      const errSystemErr: Error & { kind: string, url: string } = new Error('http://some/url: ECONNRESET')
+
+      errSystemErr.kind = 'SystemError'
+      errSystemErr.url = 'http://some/url'
+      aggregateErrorWithSystemError.errors = [errSystemErr, errTwo, errThree]
+
+      return {
+        default: [aggregateError],
+        withSystemError: [aggregateErrorWithSystemError],
+      }
+    },
+    CLOUD_PROTOCOL_UPLOAD_UNKNOWN_ERROR: () => {
+      const error = makeErr()
+
+      return {
+        default: [error],
+      }
+    },
+    CLOUD_RECORD_KEY_NOT_VALID: () => {
       return {
         default: ['record-key-123', 'project-id-123'],
       }
     },
-    DASHBOARD_PROJECT_NOT_FOUND: () => {
+    CLOUD_PROJECT_NOT_FOUND: () => {
       return {
         default: ['project-id-123', '/path/to/cypress.json'],
       }
@@ -643,7 +803,7 @@ describe('visual error templates', () => {
     },
     RENDERER_CRASHED: () => {
       return {
-        default: [],
+        default: ['Electron'],
       }
     },
     BROWSER_CRASHED: () => {
@@ -819,7 +979,7 @@ describe('visual error templates', () => {
     FREE_PLAN_EXCEEDS_MONTHLY_PRIVATE_TESTS: () => {
       return {
         default: [{
-          link: 'https://dashboard.cypress.io/project/abcd',
+          link: 'https://cloud.cypress.io/project/abcd',
           limit: 500,
           usedTestsMessage: 'test',
         }],
@@ -828,7 +988,7 @@ describe('visual error templates', () => {
     FREE_PLAN_IN_GRACE_PERIOD_EXCEEDS_MONTHLY_PRIVATE_TESTS: () => {
       return {
         default: [{
-          link: 'https://dashboard.cypress.io/project/abcd',
+          link: 'https://cloud.cypress.io/project/abcd',
           limit: 500,
           usedTestsMessage: 'test',
           gracePeriodMessage: 'the grace period ends',
@@ -922,11 +1082,6 @@ describe('visual error templates', () => {
         default: ['Electron', '/path/to/extension'],
       }
     },
-    COULD_NOT_FIND_SYSTEM_NODE: () => {
-      return {
-        default: ['16.2.1'],
-      }
-    },
     INVALID_CYPRESS_INTERNAL_ENV: () => {
       return {
         default: ['foo'],
@@ -959,7 +1114,17 @@ describe('visual error templates', () => {
     },
     CDP_RETRYING_CONNECTION: () => {
       return {
-        default: [1, 'chrome'],
+        default: [1, 'chrome', 62],
+      }
+    },
+    BROWSER_PROCESS_CLOSED_UNEXPECTEDLY: () => {
+      return {
+        default: ['chrome'],
+      }
+    },
+    BROWSER_PAGE_CLOSED_UNEXPECTEDLY: () => {
+      return {
+        default: ['chrome'],
       }
     },
     UNEXPECTED_BEFORE_BROWSER_LAUNCH_PROPERTIES: () => {
@@ -974,7 +1139,7 @@ describe('visual error templates', () => {
         default: ['spec', '1', 'spec must be a string or comma-separated list'],
       }
     },
-    FIREFOX_MARIONETTE_FAILURE: () => {
+    FIREFOX_GECKODRIVER_FAILURE: () => {
       const err = makeErr()
 
       return {
@@ -997,6 +1162,11 @@ describe('visual error templates', () => {
       }
     },
     EXPERIMENTAL_SESSION_SUPPORT_REMOVED: () => {
+      return {
+        default: [],
+      }
+    },
+    EXPERIMENTAL_SESSION_AND_ORIGIN_REMOVED: () => {
       return {
         default: [],
       }
@@ -1029,16 +1199,6 @@ describe('visual error templates', () => {
     INCOMPATIBLE_PLUGIN_RETRIES: () => {
       return {
         default: ['./path/to/cypress-plugin-retries'],
-      }
-    },
-    NODE_VERSION_DEPRECATION_BUNDLED: () => {
-      return {
-        default: [{ name: 'nodeVersion', value: 'bundled', 'configFile': 'cypress.json' }],
-      }
-    },
-    NODE_VERSION_DEPRECATION_SYSTEM: () => {
-      return {
-        default: [{ name: 'nodeVersion', value: 'system', 'configFile': 'cypress.json' }],
       }
     },
     CONFIG_FILE_MIGRATION_NEEDED: () => {
@@ -1092,6 +1252,11 @@ describe('visual error templates', () => {
         default: [{ name: 'pluginsFile', configFile: '/path/to/cypress.config.js.ts' }],
       }
     },
+    VIDEO_UPLOAD_ON_PASSES_REMOVED: () => {
+      return {
+        default: [{ name: 'videoUploadOnPasses', configFile: '/path/to/cypress.config.js.ts' }],
+      }
+    },
     CONFIG_FILE_INVALID_ROOT_CONFIG: () => {
       return {
         default: [{ name: 'specPattern', configFile: '/path/to/cypress.config.js.ts' }],
@@ -1117,6 +1282,11 @@ describe('visual error templates', () => {
         default: [{ name: 'indexHtmlFile', configFile: '/path/to/cypress.config.js.ts' }],
       }
     },
+    EXPERIMENTAL_JIT_COMPONENT_TESTING: () => {
+      return {
+        default: [],
+      }
+    },
     CONFIG_FILE_DEV_SERVER_IS_NOT_VALID: () => {
       return {
         default: ['/path/to/config.ts', {}],
@@ -1132,7 +1302,7 @@ describe('visual error templates', () => {
         default: ['wizardUpdate', {}, makeErr()],
       }
     },
-    DASHBOARD_GRAPHQL_ERROR: () => {
+    CLOUD_GRAPHQL_ERROR: () => {
       return {
         default: [makeErr()],
       }
@@ -1159,7 +1329,7 @@ describe('visual error templates', () => {
     },
     MIGRATION_MISMATCHED_CYPRESS_VERSIONS: () => {
       return {
-        default: ['9.6.0'],
+        default: ['9.6.0', '10.0.0'],
       }
     },
     MIGRATION_CYPRESS_NOT_FOUND: () => {
@@ -1189,7 +1359,7 @@ describe('visual error templates', () => {
                 package: 'vite',
                 installer: 'vite',
                 description: 'Vite is dev server that serves your source files over native ES modules',
-                minVersion: '^=2.0.0 || ^=3.0.0',
+                minVersion: '^=2.0.0 || ^=3.0.0 || ^=4.0.0 || ^=5.0.0',
               },
               satisfied: false,
               detectedVersion: '1.0.0',
@@ -1212,9 +1382,43 @@ describe('visual error templates', () => {
       }
     },
 
+    EXPERIMENTAL_RUN_ALL_SPECS_E2E_ONLY: () => {
+      return {
+        default: [],
+      }
+    },
+
     BROWSER_UNSUPPORTED_LAUNCH_OPTION: () => {
       return {
         default: ['electron', ['env']],
+      }
+    },
+
+    EXPERIMENTAL_ORIGIN_DEPENDENCIES_E2E_ONLY: () => {
+      return {
+        default: [],
+      }
+    },
+
+    EXPERIMENTAL_USE_DEFAULT_DOCUMENT_DOMAIN_E2E_ONLY: () => {
+      return {
+        default: [],
+      }
+    },
+
+    PROXY_ENCOUNTERED_INVALID_HEADER_NAME: () => {
+      const err = makeErr()
+
+      return {
+        default: [{ invalidHeaderName: 'Value' }, 'GET', 'http://localhost:8080', err],
+      }
+    },
+
+    PROXY_ENCOUNTERED_INVALID_HEADER_VALUE: () => {
+      const err = makeErr()
+
+      return {
+        default: [{ invalidHeaderValue: 'Value' }, 'GET', 'http://localhost:8080', err],
       }
     },
   })

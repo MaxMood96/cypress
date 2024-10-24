@@ -69,6 +69,7 @@ const dateTimeRe = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?(\.
 const numberRe = /^-?(\d+|\d+\.\d+|\.\d+)([eE][-+]?\d+)?$/i
 const charsBetweenCurlyBracesRe = /({.+?})/
 const isValidNumberInputChar = /[-+eE\d\.]/
+const arrowKeysRe = /^\{(ArrowUp|ArrowDown)\}$/
 
 const INITIAL_MODIFIERS = {
   alt: false,
@@ -405,6 +406,8 @@ const validateTyping = (
   const isBody = $el.is('body')
   const isTextLike = $dom.isTextLike(el)
 
+  const arrowKeyChars = arrowKeysRe.exec(chars)
+
   let dateChars
   let monthChars
   let weekChars
@@ -481,6 +484,10 @@ const validateTyping = (
       return dayjs(date, 'YYYY-MM-DD').format('YYYY-MM-DD') === date
     }
 
+    if (_.isString(chars) && arrowKeyChars) {
+      return {}
+    }
+
     if (
       _.isString(chars) &&
       dateChars &&
@@ -501,6 +508,10 @@ const validateTyping = (
   if (isMonth) {
     monthChars = monthRe.exec(chars)
 
+    if (_.isString(chars) && arrowKeyChars) {
+      return {}
+    }
+
     if (_.isString(chars) && monthChars) {
       skipCheckUntilIndex = _getEndIndex(chars, monthChars[0])
 
@@ -515,6 +526,10 @@ const validateTyping = (
 
   if (isWeek) {
     weekChars = weekRe.exec(chars)
+
+    if (_.isString(chars) && arrowKeyChars) {
+      return {}
+    }
 
     if (_.isString(chars) && weekChars) {
       skipCheckUntilIndex = _getEndIndex(chars, weekChars[0])
@@ -531,6 +546,10 @@ const validateTyping = (
   if (isTime) {
     timeChars = timeRe.exec(chars)
 
+    if (_.isString(chars) && arrowKeyChars) {
+      return {}
+    }
+
     if (_.isString(chars) && timeChars) {
       skipCheckUntilIndex = _getEndIndex(chars, timeChars[0])
 
@@ -545,6 +564,10 @@ const validateTyping = (
 
   if (isDateTime) {
     dateTimeChars = dateTimeRe.exec(chars)
+
+    if (_.isString(chars) && arrowKeyChars) {
+      return {}
+    }
 
     if (_.isString(chars) && dateTimeChars) {
       skipCheckUntilIndex = _getEndIndex(chars, dateTimeChars[0])
@@ -1100,7 +1123,7 @@ export class Keyboard {
       details.text = details.shiftText
     }
 
-    // TODO: Re-think skipping text insert if non-shift modifers
+    // TODO: Re-think skipping text insert if non-shift modifiers
     // @see https://github.com/cypress-io/cypress/issues/5622
     // if (hasModifierBesidesShift(modifiers)) {
     //   details.text = ''
@@ -1194,7 +1217,7 @@ export class Keyboard {
         ) {
           if (
             shouldIgnoreEvent('textInput', key.events) ||
-          this.fireSimulatedEvent(elToType, 'textInput', key, options)
+            this.fireSimulatedEvent(elToType, 'textInput', key, options)
           ) {
             return this.performSimulatedDefault(elToType, key, options)
           }

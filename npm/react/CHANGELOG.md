@@ -1,3 +1,31 @@
+# [@cypress/react-v8.0.2](https://github.com/cypress-io/cypress/compare/@cypress/react-v8.0.1...@cypress/react-v8.0.2) (2024-06-07)
+
+
+### Bug Fixes
+
+* update cypress to Typescript 5 ([#29568](https://github.com/cypress-io/cypress/issues/29568)) ([f3b6766](https://github.com/cypress-io/cypress/commit/f3b67666a5db0438594339c379cf27e1fd1e4abc))
+
+# [@cypress/react-v8.0.1](https://github.com/cypress-io/cypress/compare/@cypress/react-v8.0.0...@cypress/react-v8.0.1) (2024-05-06)
+
+# [@cypress/react-v8.0.0](https://github.com/cypress-io/cypress/compare/@cypress/react-v7.0.3...@cypress/react-v8.0.0) (2023-08-29)
+
+
+* `@cypress/react-v8.0.0` was inadvertently released and published. There are no breaking changes or any other changes in this release.
+
+# [@cypress/react-v7.0.3](https://github.com/cypress-io/cypress/compare/@cypress/react-v7.0.2...@cypress/react-v7.0.3) (2023-03-20)
+
+
+### Bug Fixes
+
+* **vite-dev-server:** do not use incremental esbuild option with Vite v4.2.0+ ([#26139](https://github.com/cypress-io/cypress/issues/26139)) ([3a2b2d3](https://github.com/cypress-io/cypress/commit/3a2b2d3323310c68f72f6e42203f5e93afc1cde5))
+
+# [@cypress/react-v7.0.2](https://github.com/cypress-io/cypress/compare/@cypress/react-v7.0.1...@cypress/react-v7.0.2) (2022-12-02)
+
+
+### Bug Fixes
+
+* remove cypress.server.defaults, cy.server and cy.route ([#24411](https://github.com/cypress-io/cypress/issues/24411)) ([2f18a8c](https://github.com/cypress-io/cypress/commit/2f18a8cbd2d1a90fe1f77a29cdc89571bf54109e))
+
 # [@cypress/react-v7.0.1](https://github.com/cypress-io/cypress/compare/@cypress/react-v7.0.0...@cypress/react-v7.0.1) (2022-11-08)
 
 

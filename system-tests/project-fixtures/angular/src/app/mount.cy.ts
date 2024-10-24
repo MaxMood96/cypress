@@ -20,6 +20,7 @@ import { LogoComponent } from './components/logo.component'
 import { TransientService, TransientServicesComponent } from './components/transient-services.component'
 import { ComponentProviderComponent, MessageService } from './components/component-provider.component'
 import { Cart, ProductComponent } from './components/cart.component'
+import { UrlImageComponent } from './components/url-image.component'
 
 @Component({
   template: `<app-projection>Hello World</app-projection>`,
@@ -360,9 +361,20 @@ describe('angular mount', () => {
     cy.get('p').should('have.text', 'Hi . ngOnInit fired: true and ngOnChanges fired: false and conditionalName: false')
   })
 
-  it('can load static assets', () => {
-    cy.mount(LogoComponent)
-    cy.get('img').should('be.visible').and('have.prop', 'naturalWidth').should('be.greaterThan', 0)
+  context('assets', () => {
+    it('can load static assets from <img src="..." />', () => {
+      cy.mount(LogoComponent)
+      cy.get('img').should('be.visible').and('have.prop', 'naturalWidth').should('be.greaterThan', 0)
+    })
+
+    it('can load root relative scss "url()" assets', () => {
+      cy.mount(UrlImageComponent)
+      cy.get('.test-img')
+      .invoke('css', 'background-image')
+      .then((img) => {
+        expect(img).to.contain('__cypress/src/test.png')
+      })
+    })
   })
 
   context('dependency injection', () => {
@@ -386,7 +398,7 @@ describe('angular mount', () => {
       cy.get('p').should('have.text', 'component provided service')
     })
 
-    it('should override component-providers via TestBed.overrideCmponent', () => {
+    it('should override component-providers via TestBed.overrideComponent', () => {
       TestBed.overrideComponent(ComponentProviderComponent, { set: { providers: [{ provide: MessageService, useValue: { message: 'overridden service' } }] } })
       cy.mount(ComponentProviderComponent)
       cy.get('p').should('have.text', 'overridden service')
@@ -429,28 +441,31 @@ describe('angular mount', () => {
   })
 
   describe('teardown', () => {
-    beforeEach(() => {
-      cy.get("[id^=root]").should("not.exist");
-    });
+    const cyRootSelector = '[data-cy-root]'
 
-    it("should mount", () => {
-      cy.mount(ButtonOutputComponent);
-    });
+    beforeEach(() => {
+      cy.get(cyRootSelector).should('be.empty')
+    })
+
+    it('should mount', () => {
+      cy.mount(ButtonOutputComponent)
+      cy.get(cyRootSelector).should('not.be.empty')
+    })
 
     it('should remove previous mounted component', () => {
-      cy.mount(ChildComponent, {componentProperties: { msg: 'Render 1' }})
+      cy.mount(ChildComponent, { componentProperties: { msg: 'Render 1' } })
       cy.contains('Render 1')
-      cy.mount(ChildComponent, {componentProperties: { msg: 'Render 2' }})
+      cy.mount(ChildComponent, { componentProperties: { msg: 'Render 2' } })
       cy.contains('Render 2')
 
       cy.contains('Render 1').should('not.exist')
-      cy.get('[id^=root]').children().should('have.length', 1)
+      cy.get(cyRootSelector).children().should('have.length', 1)
     })
-  });
+  })
 
   it('should error when passing in undecorated component', () => {
     Cypress.on('fail', (err) => {
-      expect(err.message).contain("Please add a @Pipe/@Directive/@Component");
+      expect(err.message).contain('Please add a @Pipe/@Directive/@Component')
 
       return false
     })
@@ -459,4 +474,33 @@ describe('angular mount', () => {
 
     cy.mount(MyClass)
   })
-});
+})
+
+context('component-index.html', () => {
+  before(() => {
+    const cyRootSelector = '[data-cy-root]'
+    const cyRoot = document.querySelector(cyRootSelector)!
+
+    expect(cyRoot.parentElement === document.body)
+    document.body.innerHTML = `
+      <div id="container">
+        <div data-cy-root></div>
+      </div>
+    `
+  })
+
+  it('preserves html hierarchy', () => {
+    const cyRootSelector = '[data-cy-root]'
+
+    cy.mount(ChildComponent, { componentProperties: { msg: 'Render 1' } })
+    cy.contains('Render 1')
+    cy.get(cyRootSelector).should('exist').parent().should('have.id', 'container')
+    cy.get('#container').should('exist').parent().should('have.prop', 'tagName').should('eq', 'BODY')
+
+    // structure persists after teardown
+    cy.mount(ChildComponent, { componentProperties: { msg: 'Render 2' } })
+    cy.contains('Render 2')
+    cy.get(cyRootSelector).should('exist').parent().should('have.id', 'container')
+    cy.get('#container').should('exist').parent().should('have.prop', 'tagName').should('eq', 'BODY')
+  })
+})

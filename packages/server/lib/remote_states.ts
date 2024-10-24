@@ -60,6 +60,12 @@ export class RemoteStates {
     return _.cloneDeep(state)
   }
 
+  hasPrimary () {
+    const remoteStates = Array.from(this.remoteStates.entries())
+
+    return !!(remoteStates.length && remoteStates[0] && remoteStates[0][1])
+  }
+
   getPrimary () {
     const state = Array.from(this.remoteStates.entries())[0][1]
 
@@ -91,7 +97,7 @@ export class RemoteStates {
 
     if (_.isString(urlOrState)) {
       const remoteOrigin = uri.origin(urlOrState)
-      const { subdomain: _unused, ...remoteProps } = cors.parseUrlIntoHostProtocolDomainTldPort(remoteOrigin)
+      const remoteProps = cors.parseUrlIntoHostProtocolDomainTldPort(remoteOrigin)
 
       if ((urlOrState === '<root>') || !fullyQualifiedRe.test(urlOrState)) {
         state = {

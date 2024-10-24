@@ -1,6 +1,7 @@
-import { getMobxRunnerStore, MobxRunnerStore } from '../store'
+import { getMobxRunnerStore, MobxRunnerStore, useSpecStore } from '../store'
 import { getReporterElement } from './utils'
-import { getEventManager, getRunnerConfigFromWindow } from '.'
+import { getEventManager } from '.'
+import { getRunnerConfigFromWindow } from './get-runner-config-from-window'
 import type { EventManager } from './event-manager'
 import { useRunnerUiStore } from '../store/runner-ui-store'
 
@@ -38,6 +39,7 @@ function renderReporter (
   eventManager: EventManager,
 ) {
   const runnerUiStore = useRunnerUiStore()
+  const specsStore = useSpecStore()
 
   const config = getRunnerConfigFromWindow()
 
@@ -51,6 +53,7 @@ function renderReporter (
     // Studio can only be enabled for e2e testing
     studioEnabled: window.__CYPRESS_TESTING_TYPE__ === 'e2e' && config.experimentalStudio,
     runnerStore: store,
+    testFilter: specsStore.testFilter,
   })
 
   window.UnifiedRunner.ReactDOM.render(reporter, root)

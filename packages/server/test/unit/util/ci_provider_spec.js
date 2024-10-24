@@ -40,6 +40,23 @@ describe('lib/util/ci_provider', () => {
     return expectsCommitParams(null)
   })
 
+  it('allows for user provided environment variables', () => {
+    resetEnv = mockedEnv({
+      CYPRESS_PULL_REQUEST_ID: 'cypressPullRequestId',
+      CYPRESS_PULL_REQUEST_URL: 'cypressPullRequestUrl',
+      CYPRESS_CI_BUILD_URL: 'cypressCiBuildUrl',
+    }, { clear: true })
+
+    expectsName(null)
+    expectsCiParams({
+      cypressPullRequestId: 'cypressPullRequestId',
+      cypressPullRequestUrl: 'cypressPullRequestUrl',
+      cypressCiBuildUrl: 'cypressCiBuildUrl',
+    })
+
+    return expectsCommitParams(null)
+  })
+
   it('does not extract from commit environment variables yet', () => {
     // see fallback environment variables
     // https://github.com/cypress-io/commit-info#fallback-environment-variables
@@ -281,6 +298,7 @@ describe('lib/util/ci_provider', () => {
       BUILDKITE_PULL_REQUEST: 'buildkitePullRequest',
       BUILDKITE_PULL_REQUEST_REPO: 'buildkitePullRequestRepo',
       BUILDKITE_PULL_REQUEST_BASE_BRANCH: 'buildkitePullRequestBaseBranch',
+      BUILDKITE_RETRY_COUNT: 'buildkiteRetryCount',
 
       BUILDKITE_COMMIT: 'buildKiteCommit',
       BUILDKITE_BRANCH: 'buildKiteBranch',
@@ -294,6 +312,7 @@ describe('lib/util/ci_provider', () => {
     expectsCiParams({
       buildkiteRepo: 'buildkiteRepo',
       buildkiteJobId: 'buildkiteJobId',
+      buildkiteRetryCount: 'buildkiteRetryCount',
       buildkiteSource: 'buildkiteSource',
       buildkiteBuildId: 'buildkiteBuildId',
       buildkiteBuildUrl: 'buildkiteBuildUrl',
@@ -334,7 +353,6 @@ describe('lib/util/ci_provider', () => {
   it('circle', () => {
     resetEnv = mockedEnv({
       CIRCLECI: 'true',
-
       CIRCLE_JOB: 'circleJob',
       CIRCLE_BUILD_NUM: 'circleBuildNum',
       CIRCLE_BUILD_URL: 'circleBuildUrl',
@@ -342,7 +360,9 @@ describe('lib/util/ci_provider', () => {
       CIRCLE_PR_REPONAME: 'circlePrReponame',
       CIRCLE_PR_USERNAME: 'circlePrUsername',
       CIRCLE_COMPARE_URL: 'circleCompareUrl',
+      CIRCLE_PIPELINE_ID: 'circlePipelineId',
       CIRCLE_WORKFLOW_ID: 'circleWorkflowId',
+      CIRCLE_WORKFLOW_JOB_ID: 'circleWorkflowJobId',
       CIRCLE_PULL_REQUEST: 'circlePullRequest',
       CIRCLE_REPOSITORY_URL: 'circleRepositoryUrl',
       CI_PULL_REQUEST: 'ciPullRequest',
@@ -361,7 +381,9 @@ describe('lib/util/ci_provider', () => {
       circlePrReponame: 'circlePrReponame',
       circlePrUsername: 'circlePrUsername',
       circleCompareUrl: 'circleCompareUrl',
+      circlePipelineId: 'circlePipelineId',
       circleWorkflowId: 'circleWorkflowId',
+      circleWorkflowJobId: 'circleWorkflowJobId',
       circlePullRequest: 'circlePullRequest',
       circleRepositoryUrl: 'circleRepositoryUrl',
       ciPullRequest: 'ciPullRequest',
@@ -425,6 +447,8 @@ describe('lib/util/ci_provider', () => {
       CI_COMMIT_MESSAGE: 'ciCommitMessage',
       CI_COMMITTER_NAME: 'ciCommitterName',
       CI_COMMITTER_EMAIL: 'ciCommitterEmail',
+      CI_PR_NUMBER: 'prNumber',
+      CI_PULL_REQUEST: 'pullRequest',
     }, { clear: true })
 
     expectsName('codeshipPro')
@@ -432,6 +456,8 @@ describe('lib/util/ci_provider', () => {
       ciBuildId: 'ciBuildId',
       ciRepoName: 'ciRepoName',
       ciProjectId: 'ciProjectId',
+      ciPrNumber: 'prNumber',
+      ciPullRequest: 'pullRequest',
     })
 
     return expectsCommitParams({
@@ -542,23 +568,22 @@ describe('lib/util/ci_provider', () => {
   })
 
   it('github actions', () => {
+    // with GH_BRANCH used as branch
     resetEnv = mockedEnv({
       GITHUB_ACTIONS: 'true',
-
       GITHUB_WORKFLOW: 'ciGitHubWorkflowName',
       GITHUB_ACTION: 'ciGitHubActionId',
       GITHUB_EVENT_NAME: 'ciEventName',
       GITHUB_RUN_ID: 'ciGithubRunId',
+      GITHUB_JOB: 'jobName',
       GITHUB_RUN_ATTEMPT: 'ciGithubRunAttempt',
       GITHUB_REPOSITORY: 'ciGithubRepository',
-      GH_BRANCH: '',
-
       GITHUB_SHA: 'ciCommitSha',
+      GH_BRANCH: 'GHCommitBranch',
       GITHUB_REF: 'ciCommitRef',
-
-      // only for forked repos
       GITHUB_HEAD_REF: 'ciHeadRef',
       GITHUB_BASE_REF: 'ciBaseRef',
+      GITHUB_REF_NAME: 'ciRefName',
     }, { clear: true })
 
     expectsName('githubActions')
@@ -569,6 +594,11 @@ describe('lib/util/ci_provider', () => {
       githubRepository: 'ciGithubRepository',
       githubRunAttempt: 'ciGithubRunAttempt',
       githubRunId: 'ciGithubRunId',
+      githubJob: 'jobName',
+      githubBaseRef: 'ciBaseRef',
+      githubHeadRef: 'ciHeadRef',
+      githubRefName: 'ciRefName',
+      githubRef: 'ciCommitRef',
     })
 
     expectsCommitParams({
@@ -576,19 +606,34 @@ describe('lib/util/ci_provider', () => {
       defaultBranch: 'ciBaseRef',
       runAttempt: 'ciGithubRunAttempt',
       remoteBranch: 'ciHeadRef',
-      branch: 'ciCommitRef',
+      branch: 'GHCommitBranch',
     })
 
+    // with GITHUB_HEAD_REF used as branch
     resetEnv = mockedEnv({
       GITHUB_ACTIONS: 'true',
+      GH_BRANCH: undefined,
+      GITHUB_HEAD_REF: 'ciHeadRef',
+      GITHUB_REF_NAME: 'ciRefName',
       GITHUB_REF: 'ciCommitRef',
-      GH_BRANCH: 'GHCommitBranch',
-      GITHUB_RUN_ATTEMPT: 'ciGithubRunAttempt',
+    }, { clear: true })
+
+    expectsCommitParams({
+      branch: 'ciHeadRef',
+      remoteBranch: 'ciHeadRef',
+    })
+
+    // with GITHUB_REF_NAME used as branch
+    resetEnv = mockedEnv({
+      GITHUB_ACTIONS: 'true',
+      GH_BRANCH: undefined,
+      GITHUB_HEAD_REF: undefined,
+      GITHUB_REF_NAME: 'ciRefName',
+      GITHUB_REF: 'ciCommitRef',
     }, { clear: true })
 
     return expectsCommitParams({
-      branch: 'GHCommitBranch',
-      runAttempt: 'ciGithubRunAttempt',
+      branch: 'ciRefName',
     })
   })
 
@@ -617,6 +662,8 @@ describe('lib/util/ci_provider', () => {
       CI_COMMIT_MESSAGE: 'ciCommitMessage',
       GITLAB_USER_NAME: 'gitlabUserName',
       GITLAB_USER_EMAIL: 'gitlabUserEmail',
+      CI_MERGE_REQUEST_SOURCE_BRANCH_NAME: 'sourceBranchName',
+      CI_MERGE_REQUEST_SOURCE_BRANCH_SHA: 'sourceBranchSha',
     }, { clear: true })
 
     expectsName('gitlab')
@@ -633,6 +680,8 @@ describe('lib/util/ci_provider', () => {
       ciRepositoryUrl: 'ciRepositoryUrl',
       ciEnvironmentUrl: 'ciEnvironmentUrl',
       ciDefaultBranch: 'ciDefaultBranch',
+      ciMergeRequestSourceBranchName: 'sourceBranchName',
+      ciMergeRequestSourceBranchSha: 'sourceBranchSha',
     })
 
     expectsCommitParams({
@@ -705,6 +754,9 @@ describe('lib/util/ci_provider', () => {
 
       COMMIT_SHA: 'commitSha',
       BRANCH_NAME: 'branchName',
+      _HEAD_BRANCH: 'headBranch',
+      _BASE_BRANCH: 'baseBranch',
+      _PR_NUMBER: 'prNumber',
     }, { clear: true })
 
     expectsName('googleCloud')
@@ -713,6 +765,9 @@ describe('lib/util/ci_provider', () => {
       projectId: 'projectId',
       commitSha: 'commitSha',
       branchName: 'branchName',
+      headBranch: 'headBranch',
+      baseBranch: 'baseBranch',
+      prNumber: 'prNumber',
     })
 
     expectsCommitParams({
@@ -733,55 +788,127 @@ describe('lib/util/ci_provider', () => {
     return expectsName('googleCloud')
   })
 
-  it('jenkins', () => {
-    resetEnv = mockedEnv({
-      JENKINS_URL: 'true',
+  describe('jenkins', () => {
+    it('with legacy env', () => {
+      resetEnv = mockedEnv({
+        JENKINS_URL: 'true',
 
-      BUILD_ID: 'buildId',
-      BUILD_URL: 'buildUrl',
-      BUILD_NUMBER: 'buildNumber',
-      ghprbPullId: 'gbprbPullId',
+        BUILD_ID: 'buildId',
+        BUILD_URL: 'buildUrl',
+        BUILD_NUMBER: 'buildNumber',
+        ghprbPullId: 'gbprbPullId',
 
-      GIT_COMMIT: 'gitCommit',
-      GIT_BRANCH: 'gitBranch',
-    }, { clear: true })
+        GIT_COMMIT: 'gitCommit',
+        GIT_BRANCH: 'gitBranch',
+        GIT_AUTHOR_NAME: 'gitAuthorName',
+        GIT_AUTHOR_EMAIL: 'gitAuthorEmail',
+      }, { clear: true })
 
-    expectsName('jenkins')
-    expectsCiParams({
-      buildId: 'buildId',
-      buildUrl: 'buildUrl',
-      buildNumber: 'buildNumber',
-      ghprbPullId: 'gbprbPullId',
+      expectsName('jenkins')
+      expectsCiParams({
+        buildId: 'buildId',
+        buildUrl: 'buildUrl',
+        buildNumber: 'buildNumber',
+        ghprbPullId: 'gbprbPullId',
+      })
+
+      expectsCommitParams({
+        sha: 'gitCommit',
+        branch: 'gitBranch',
+        authorName: 'gitAuthorName',
+        authorEmail: 'gitAuthorEmail',
+      })
+
+      resetEnv = mockedEnv({
+        JENKINS_HOME: '/path/to/jenkins',
+      }, { clear: true })
+
+      expectsName('jenkins')
+
+      resetEnv = mockedEnv({
+        JENKINS_VERSION: '1.2.3',
+      }, { clear: true })
+
+      expectsName('jenkins')
+
+      resetEnv = mockedEnv({
+        HUDSON_HOME: '/path/to/jenkins',
+      }, { clear: true })
+
+      expectsName('jenkins')
+
+      resetEnv = mockedEnv({
+        HUDSON_URL: 'true',
+      }, { clear: true })
+
+      return expectsName('jenkins')
     })
 
-    expectsCommitParams({
-      sha: 'gitCommit',
-      branch: 'gitBranch',
+    it('with change request params (PR Scenario)', () => {
+      resetEnv = mockedEnv({
+        JENKINS_URL: 'true',
+
+        BUILD_ID: 'buildId',
+        BUILD_NUMBER: 'buildNumber',
+        CHANGE_BRANCH: 'changeBranch',
+        CYPRESS_CI_BUILD_URL: 'cypressCiBuildUrl',
+
+        GIT_COMMIT: 'gitCommit',
+        CHANGE_ID: 'changeId',
+        CHANGE_URL: 'changeUrl',
+        CHANGE_TITLE: 'changeTitle',
+        CHANGE_TARGET: 'changeTarget',
+        CHANGE_AUTHOR_DISPLAY_NAME: 'changeAuthorDisplayName',
+        CHANGE_AUTHOR_EMAIL: 'changeAuthorEmail',
+      }, { clear: true })
+
+      expectsName('jenkins')
+      expectsCiParams({
+        buildId: 'buildId',
+        buildNumber: 'buildNumber',
+        cypressCiBuildUrl: 'cypressCiBuildUrl',
+        changeId: 'changeId',
+        changeTitle: 'changeTitle',
+        changeUrl: 'changeUrl',
+        changeTarget: 'changeTarget',
+      })
+
+      return expectsCommitParams({
+        sha: 'gitCommit',
+        branch: 'changeBranch',
+        authorName: 'changeAuthorDisplayName',
+        authorEmail: 'changeAuthorEmail',
+      })
     })
 
-    resetEnv = mockedEnv({
-      JENKINS_HOME: '/path/to/jenkins',
-    }, { clear: true })
+    it('with userProvided', () => {
+      resetEnv = mockedEnv({
+        JENKINS_URL: 'true',
 
-    expectsName('jenkins')
+        BUILD_ID: 'buildId',
+        BUILD_NUMBER: 'buildNumber',
+        CYPRESS_PULL_REQUEST_ID: 'cypressPullRequestId',
+        CYPRESS_PULL_REQUEST_URL: 'cypressPullRequestUrl',
+        CYPRESS_CI_BUILD_URL: 'cypressCiBuildUrl',
 
-    resetEnv = mockedEnv({
-      JENKINS_VERSION: '1.2.3',
-    }, { clear: true })
+        GIT_COMMIT: 'gitCommit',
+        GIT_BRANCH: 'gitBranch',
+      }, { clear: true })
 
-    expectsName('jenkins')
+      expectsName('jenkins')
+      expectsCiParams({
+        buildId: 'buildId',
+        buildNumber: 'buildNumber',
+        cypressPullRequestId: 'cypressPullRequestId',
+        cypressPullRequestUrl: 'cypressPullRequestUrl',
+        cypressCiBuildUrl: 'cypressCiBuildUrl',
+      })
 
-    resetEnv = mockedEnv({
-      HUDSON_HOME: '/path/to/jenkins',
-    }, { clear: true })
-
-    expectsName('jenkins')
-
-    resetEnv = mockedEnv({
-      HUDSON_URL: 'true',
-    }, { clear: true })
-
-    return expectsName('jenkins')
+      return expectsCommitParams({
+        sha: 'gitCommit',
+        branch: 'gitBranch',
+      })
+    })
   })
 
   it('semaphore', () => {
@@ -794,7 +921,9 @@ describe('lib/util/ci_provider', () => {
       SEMAPHORE_CURRENT_THREAD: 'semaphoreCurrentThread',
       SEMAPHORE_EXECUTABLE_UUID: 'semaphoreExecutableUuid',
       SEMAPHORE_GIT_BRANCH: 'show-semaphore-v2-266',
+      SEMAPHORE_GIT_WORKING_BRANCH: 'show-semaphore-v2-266',
       SEMAPHORE_GIT_DIR: 'cypress-example-kitchensink',
+      SEMAPHORE_GIT_PR_NUMBER: '1',
       SEMAPHORE_GIT_REF: 'refs/heads/show-semaphore-v2-266',
       SEMAPHORE_GIT_REF_TYPE: 'branch',
       SEMAPHORE_GIT_REPO_SLUG: 'cypress-io/cypress-example-kitchensink',
@@ -826,7 +955,9 @@ describe('lib/util/ci_provider', () => {
       semaphoreCurrentThread: 'semaphoreCurrentThread',
       semaphoreExecutableUuid: 'semaphoreExecutableUuid',
       semaphoreGitBranch: 'show-semaphore-v2-266',
+      semaphoreGitWorkingBranch: 'show-semaphore-v2-266',
       semaphoreGitDir: 'cypress-example-kitchensink',
+      semaphoreGitPrNumber: '1',
       semaphoreGitRef: 'refs/heads/show-semaphore-v2-266',
       semaphoreGitRefType: 'branch',
       semaphoreGitRepoSlug: 'cypress-io/cypress-example-kitchensink',
@@ -978,34 +1109,34 @@ describe('lib/util/ci_provider', () => {
     })
   })
 
-  it('layerci', () => {
+  it('webappio', () => {
     resetEnv = mockedEnv({
-      LAYERCI: 'true',
+      WEBAPPIO: 'true',
 
-      LAYERCI_JOB_ID: 'jobId',
-      LAYERCI_RUNNER_ID: 'runnerId',
+      JOB_ID: 'jobId',
+      RUNNER_ID: 'runnerId',
       RETRY_INDEX: 'retryIndex',
 
       // git info
-      LAYERCI_PULL_REQUEST: 'pullRequest',
-      LAYERCI_REPO_NAME: 'repoName',
-      LAYERCI_REPO_OWNER: 'repoOwner',
-      LAYERCI_BRANCH: 'branch',
+      PULL_REQUEST_URL: 'pullRequest',
+      REPOSITORY_NAME: 'repoName',
+      REPOSITORY_OWNER: 'repoOwner',
+      GIT_BRANCH: 'branch',
       GIT_TAG: 'tag',
       GIT_COMMIT: 'commit',
       GIT_COMMIT_TITLE: 'commitTitle',
     }, { clear: true })
 
-    expectsName('layerci')
+    expectsName('webappio')
     expectsCiParams({
-      layerciJobId: 'jobId',
-      layerciRunnerId: 'runnerId',
+      jobId: 'jobId',
+      runnerId: 'runnerId',
       retryIndex: 'retryIndex',
       gitTag: 'tag',
-      layerciBranch: 'branch',
-      layerciPullRequest: 'pullRequest',
-      layerciRepoName: 'repoName',
-      layerciRepoOwner: 'repoOwner',
+      gitBranch: 'branch',
+      pullRequestUrl: 'pullRequest',
+      repositoryName: 'repoName',
+      repositoryOwner: 'repoOwner',
     })
 
     return expectsCommitParams({
@@ -1025,6 +1156,14 @@ describe('lib/util/ci_provider', () => {
       BUILD_BUILDNUMBER: 'buildNumber',
       BUILD_CONTAINERID: 'containerId',
       BUILD_REPOSITORY_URI: 'buildRepositoryUri',
+      SYSTEM_PLANID: 'planId',
+      SYSTEM_PULLREQUEST_PULLREQUESTNUMBER: 'systemPullrequestPullrequestnumber',
+      SYSTEM_PULLREQUEST_TARGETBRANCH: 'targetBranch',
+      SYSTEM_PULLREQUEST_TARGETBRANCHNAME: 'targetBranchName',
+      SYSTEM_JOBID: 'jobid',
+      SYSTEM_STAGEATTEMPT: 'stageAttempt',
+      SYSTEM_PHASEATTEMPT: 'phaseAttempt',
+      SYSTEM_JOBATTEMPT: 'jobAttempt',
 
       BUILD_SOURCEVERSION: 'commit',
       BUILD_SOURCEBRANCHNAME: 'branch',
@@ -1039,6 +1178,14 @@ describe('lib/util/ci_provider', () => {
       buildBuildnumber: 'buildNumber',
       buildContainerid: 'containerId',
       buildRepositoryUri: 'buildRepositoryUri',
+      systemPlanid: 'planId',
+      systemPullrequestPullrequestnumber: 'systemPullrequestPullrequestnumber',
+      systemPullrequestTargetbranch: 'targetBranch',
+      systemPullrequestTargetbranchname: 'targetBranchName',
+      systemJobid: 'jobid',
+      systemStageattempt: 'stageAttempt',
+      systemPhaseattempt: 'phaseAttempt',
+      systemJobattempt: 'jobAttempt',
     })
 
     return expectsCommitParams({

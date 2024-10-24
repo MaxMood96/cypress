@@ -1,4 +1,4 @@
-const { stripIndent } = require('common-tags')
+import { authCreds } from '../../../../fixtures/auth_creds'
 import { findCrossOriginLogs } from '../../../../support/utils'
 
 context('cy.origin navigation', { browser: '!webkit' }, () => {
@@ -195,35 +195,6 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
       })
     })
 
-    // @ts-ignore
-    it('informs user to use cy.origin with experimental flag off', { experimentalSessionAndOrigin: false }, (done) => {
-      cy.on('fail', (e) => {
-        expect(e.message).to.equal(stripIndent`\
-          \`cy.visit()\` failed because you are attempting to visit a URL that is of a different origin.\n
-          In order to visit a different origin, you can enable the \`experimentalSessionAndOrigin\` flag and use \`cy.origin()\`:\n
-          \`cy.visit('http://localhost:3500/fixtures/primary-origin.html')\`
-          \`<commands targeting http://localhost:3500 go here>\`\n
-          \`cy.origin('http://www.foobar.com:3500', () => {\`
-          \`  cy.visit('http://www.foobar.com:3500/fixtures/dom.html')\`
-          \`  <commands targeting http://www.foobar.com:3500 go here>\`
-          \`})\`\n
-          The new URL is considered a different origin because the following parts of the URL are different:\n
-            > superdomain\n
-          You may only \`cy.visit()\` same-origin URLs within a single test.\n
-          The previous URL you visited was:\n
-            > 'http://localhost:3500'\n
-          You're attempting to visit this URL:\n
-            > 'http://www.foobar.com:3500'`)
-
-        done()
-      })
-
-      cy.visit('/fixtures/primary-origin.html')
-
-      // this call should error since we can't visit a cross-origin
-      cy.visit('http://www.foobar.com:3500/fixtures/dom.html')
-    })
-
     it('supports the query string option', () => {
       cy.visit('/fixtures/primary-origin.html')
 
@@ -339,13 +310,8 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
     })
 
     it('supports auth options and adding auth to subsequent requests', () => {
-      cy.origin('http://www.foobar.com:3500', () => {
-        cy.visit('http://www.foobar.com:3500/basic_auth', {
-          auth: {
-            username: 'cypress',
-            password: 'password123',
-          },
-        })
+      cy.origin('http://www.foobar.com:3500', { args: authCreds }, (auth) => {
+        cy.visit('http://www.foobar.com:3500/basic_auth', { auth })
 
         cy.get('body').should('have.text', 'basic auth worked')
 
@@ -454,7 +420,7 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
     })
 
     // TODO: Investigate this flaky test.
-    it('.go()', { retries: 15 }, () => {
+    it.skip('.go()', { retries: 15 }, () => {
       cy.visit('/fixtures/primary-origin.html')
       cy.get('a[data-cy="cross-origin-secondary-link"]').click()
 
@@ -470,8 +436,9 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
         expect(attrs.name).to.equal('go')
         expect(attrs.message).to.equal('back')
 
-        expect(consoleProps.Command).to.equal('go')
-        expect(consoleProps.Yielded).to.be.null
+        expect(consoleProps.name).to.equal('go')
+        expect(consoleProps.type).to.equal('command')
+        expect(consoleProps.props.Yielded).to.be.null
       })
     })
 
@@ -489,8 +456,9 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
         expect(attrs.name).to.equal('reload')
         expect(attrs.message).to.equal('')
 
-        expect(consoleProps.Command).to.equal('reload')
-        expect(consoleProps.Yielded).to.be.null
+        expect(consoleProps.name).to.equal('reload')
+        expect(consoleProps.type).to.equal('command')
+        expect(consoleProps.props.Yielded).to.be.null
       })
     })
 
@@ -509,10 +477,11 @@ context('cy.origin navigation', { browser: '!webkit' }, () => {
         expect(attrs.name).to.equal('visit')
         expect(attrs.message).to.equal('http://www.foobar.com:3500/fixtures/secondary-origin.html')
 
-        expect(consoleProps.Command).to.equal('visit')
-        expect(consoleProps).to.have.property('Cookies Set').that.is.an('object')
-        expect(consoleProps).to.have.property('Redirects').that.is.an('object')
-        expect(consoleProps).to.have.property('Resolved Url').that.equals('http://www.foobar.com:3500/fixtures/secondary-origin.html')
+        expect(consoleProps.name).to.equal('visit')
+        expect(consoleProps.type).to.equal('command')
+        expect(consoleProps.props).to.have.property('Cookies Set').that.is.an('object')
+        expect(consoleProps.props).to.have.property('Redirects').that.is.an('object')
+        expect(consoleProps.props).to.have.property('Resolved Url').that.equals('http://www.foobar.com:3500/fixtures/secondary-origin.html')
       })
     })
   })

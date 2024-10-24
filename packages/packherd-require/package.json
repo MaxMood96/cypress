@@ -6,10 +6,9 @@
   "main": "dist/require.js",
   "scripts": {
     "build": "tsc",
-    "build-prod": "yarn build",
     "check-ts": "tsc --noEmit && yarn -s tslint",
-    "clean-deps": "rimraf node_modules",
     "clean": "rimraf dist",
+    "clean-deps": "rimraf node_modules",
     "test": "yarn test-unit",
     "test-unit": "mocha --config ./test/.mocharc.js",
     "tslint": "tslint --config ../ts/tslint.json --project .",
@@ -17,7 +16,7 @@
   },
   "dependencies": {
     "convert-source-map": "^1.7.0",
-    "debug": "^4.3.1",
+    "debug": "^4.3.4",
     "source-map-js": "^0.6.2"
   },
   "devDependencies": {
@@ -29,5 +28,6 @@
     "dist",
     "src/require.ts"
   ],
-  "types": "src/require.ts"
+  "types": "src/require.ts",
+  "nx": {}
 }

@@ -4,7 +4,7 @@
       <source media="(prefers-color-scheme: dark)"  srcset="./assets/cypress-logo-dark.png">
       <source media="(prefers-color-scheme: light)" srcset="./assets/cypress-logo-light.png">
       <img alt="Cypress Logo" src="./assets/cypress-logo-light.png">
-    </picture>    
+    </picture>
   </a>
 </p>
 <p align="center">
@@ -28,8 +28,8 @@
   <a href="https://www.npmjs.com/package/cypress">
     <img src="https://img.shields.io/npm/dm/cypress.svg" alt="npm"/>
   </a>
-  <a href="https://gitter.im/cypress-io/cypress">
-    <img src="https://img.shields.io/gitter/room/cypress-io/cypress.svg" alt="Gitter chat"/>
+  <a href="https://on.cypress.io/discord">
+    <img src="https://img.shields.io/badge/chat-on%20Discord-brightgreen" alt="Discord chat"/>
   </a>
     <a href="https://stackshare.io/cypress">
     <img src="https://img.stackshare.io/misc/follow-on-stackshare-badge.svg" alt="StackShare"/>
@@ -57,19 +57,19 @@ or
 ```bash
 yarn add cypress --dev
 ```
+or
+```bash
+pnpm add cypress --save-dev
+```
 
-![installing-cli e1693232](https://user-images.githubusercontent.com/1271364/31740846-7bf607f0-b420-11e7-855f-41c996040d31.gif)
-
+![installing-cli e1693232](./assets/cypress-installation.gif)
 
 ## Contributing
 
-- [![CircleCI](https://circleci.com/gh/cypress-io/cypress/tree/develop.svg?style=svg)](https://circleci.com/gh/cypress-io/cypress/tree/develop) - `develop` branch
+[![cypress](https://img.shields.io/endpoint?url=https://cloud.cypress.io/badge/simple/ypt4pf/develop&style=flat&logo=cypress)](https://cloud.cypress.io/projects/ypt4pf/runs)
+[![CircleCI](https://circleci.com/gh/cypress-io/cypress/tree/develop.svg?style=svg)](https://circleci.com/gh/cypress-io/cypress/tree/develop) -  `develop` branch
 
 Please see our [Contributing Guideline](./CONTRIBUTING.md) which explains repo organization, linting, testing, and other steps.
-
-## How we work
-
-At Cypress we value our community and strive to be as open and transparent with them as possible.  Check out [our guide](./cypress-prioritization-and-triage.md) on how we prioritize community issues.
 
 ## License
 
@@ -79,7 +79,13 @@ This project is licensed under the terms of the [MIT license](/LICENSE).
 
 ## Badges
 
-Let the world know your project is using Cypress.io to test with this cool badge
+Configure a badge for your project's README to show your test status or test count in the [Cypress Cloud](https://www.cypress.io/cloud).
+
+[![cypress](https://img.shields.io/endpoint?url=https://cloud.cypress.io/badge/simple/ypt4pf/develop&style=flat&logo=cypress)](https://cloud.cypress.io/projects/ypt4pf/runs)
+
+[![cypress](https://img.shields.io/endpoint?url=https://cloud.cypress.io/badge/count/ypt4pf/develop&style=flat&logo=cypress)](https://cloud.cypress.io/projects/ypt4pf/runs)
+
+Or let the world know your project is using Cypress with the badge below.
 
 [![Cypress.io](https://img.shields.io/badge/tested%20with-Cypress-04C38E.svg)](https://www.cypress.io/)
 

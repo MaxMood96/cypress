@@ -1,13 +1,13 @@
 <template>
-  <div class="mx-auto my-32px">
+  <div class="mx-auto my-[32px]">
     <div
       v-if="$slots.accessory"
-      class="w-full mb-24px"
+      class="w-full mb-[24px]"
     >
       <slot name="accessory" />
     </div>
-    <div class="w-full border-1 border-gray-100 rounded flex flex-col">
-      <div class="flex-grow">
+    <div class="w-full border border-gray-100 rounded flex flex-col">
+      <div class="grow">
         <slot :backFn="backFn" />
       </div>
       <ButtonBar
@@ -33,7 +33,7 @@
 import ButtonBar from './ButtonBar.vue'
 import { computed } from 'vue'
 import { useI18n } from '@cy/i18n'
-import type { ButtonVariants } from '@cy/components/Button.vue'
+import type { ButtonVariants } from '@cypress-design/vue-button'
 
 const { t } = useI18n()
 
@@ -61,7 +61,7 @@ const props = withDefaults(
     nextFn: undefined,
     backFn: undefined,
     skipFn: undefined,
-    mainButtonVariant: 'primary',
+    mainButtonVariant: 'indigo-dark',
   },
 )
 

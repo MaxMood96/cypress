@@ -7,7 +7,7 @@ import path from 'path'
 import Debug from 'debug'
 import commonPathPrefix from 'common-path-prefix'
 import type { FSWatcher } from 'chokidar'
-import { defaultSpecPattern } from '@packages/config'
+import { defaultSpecPattern, defaultExcludeSpecPattern } from '@packages/config'
 import parseGlob from 'parse-glob'
 import micromatch from 'micromatch'
 import RandExp from 'randexp'
@@ -21,7 +21,12 @@ import { toPosix } from '../util/file'
 import type { FilePartsShape } from '@packages/graphql/src/schemaTypes/objectTypes/gql-FileParts'
 import type { ProjectShape } from '../data'
 import type { FindSpecs } from '../actions'
-import { getDefaultSpecFileName } from './migration/utils'
+import { FileExtension, getDefaultSpecFileName } from './migration/utils'
+
+type SpecPatterns = {
+  specPattern?: string[]
+  excludeSpecPattern?: string[]
+}
 
 interface MatchedSpecs {
   projectRoot: string
@@ -29,6 +34,9 @@ interface MatchedSpecs {
   specAbsolutePaths: string[]
   specPattern: string | string[]
 }
+
+const toArray = (val?: string | string[]) => val ? typeof val === 'string' ? [val] : val : undefined
+
 export function matchedSpecs ({
   projectRoot,
   testingType,
@@ -140,7 +148,7 @@ export function getPathFromSpecPattern ({
   name = '' }:
 { specPattern: string
   testingType: TestingType
-  fileExtensionToUse?: 'js' | 'ts'
+  fileExtensionToUse?: FileExtension
   name?: string}) {
   function replaceWildCard (s: string, fallback: string) {
     return s.replace(/\*/g, fallback)
@@ -176,7 +184,13 @@ export function getPathFromSpecPattern ({
 
   const globWithoutBraces = micromatch.braces(glob, { expand: true })
 
-  let finalGlob = globWithoutBraces[0]
+  let finalGlob
+
+  if (fileExtensionToUse) {
+    finalGlob = globWithoutBraces.find((glob) => glob.includes(fileExtensionToUse)) || globWithoutBraces[0]
+  } else {
+    finalGlob = globWithoutBraces[0]
+  }
 
   if (fileExtensionToUse) {
     const filteredGlob = micromatch(globWithoutBraces, `*.${fileExtensionToUse}`, { basename: true })
@@ -199,6 +213,8 @@ export class ProjectDataSource {
   private _specWatcher: FSWatcher | null = null
   private _specs: SpecWithRelativeRoot[] = []
   private _hasNonExampleSpec: boolean = false
+
+  #runAllSpecs: string[] = []
 
   constructor (private ctx: DataContext) {}
 
@@ -230,6 +246,14 @@ export class ProjectDataSource {
     this._specs = specs
   }
 
+  get runAllSpecs () {
+    return this.#runAllSpecs
+  }
+
+  setRunAllSpecs (specs: string[]) {
+    this.#runAllSpecs = specs
+  }
+
   get hasNonExampleSpec () {
     return this._hasNonExampleSpec
   }
@@ -242,17 +266,35 @@ export class ProjectDataSource {
     this.ctx.coreData.app.relaunchBrowser = relaunchBrowser
   }
 
-  async specPatterns (): Promise<{
-    specPattern?: string[]
-    excludeSpecPattern?: string[]
-  }> {
-    const toArray = (val?: string | string[]) => val ? typeof val === 'string' ? [val] : val : undefined
-
+  /**
+   * Retrieve the applicable spec patterns for the current testing type
+   */
+  async specPatterns (): Promise<SpecPatterns> {
     const config = await this.getConfig()
 
     return {
       specPattern: toArray(config.specPattern),
       excludeSpecPattern: toArray(config.excludeSpecPattern),
+    }
+  }
+
+  /**
+   * Retrieve the applicable spec patterns for a given testing type. Can be used to check whether
+   * a spec satisfies the pattern when outside a given testing type.
+   */
+  async specPatternsByTestingType (testingType: TestingType): Promise<SpecPatterns> {
+    const configFile = await this.ctx.lifecycleManager.getConfigFileContents()
+
+    if (testingType === 'e2e') {
+      return {
+        specPattern: toArray(configFile.e2e?.specPattern ?? defaultSpecPattern.e2e),
+        excludeSpecPattern: toArray(configFile.e2e?.excludeSpecPattern ?? defaultExcludeSpecPattern.e2e),
+      }
+    }
+
+    return {
+      specPattern: toArray(configFile.component?.specPattern ?? defaultSpecPattern.component),
+      excludeSpecPattern: toArray(configFile.component?.excludeSpecPattern ?? defaultExcludeSpecPattern.component),
     }
   }
 
@@ -330,7 +372,7 @@ export class ProjectDataSource {
     // When file system changes are detected, we retrieve any spec files matching
     // the determined specPattern. This function is debounced to limit execution
     // during sequential file operations.
-    const onProjectFileSystemChange = _.debounce(async () => {
+    const onProjectFileSystemChange = _.debounce(async (_type, _filePath) => {
       const specs = await this.findSpecs({
         projectRoot,
         testingType,
@@ -339,6 +381,22 @@ export class ProjectDataSource {
         excludeSpecPattern,
         additionalIgnorePattern,
       })
+
+      try {
+        const config = await this.ctx.project.getConfig()
+
+        // If running the experimentalJustInTimeCompile for CT,
+        // ignore this watcher since we only handle one spec at a time and do not need to recompile any time the file system changes.
+        if (config.experimentalJustInTimeCompile && testingType === 'component') {
+          this.ctx.actions.project.refreshSpecs(specs)
+
+          // If no differences are found, we do not need to emit events
+          return
+        }
+      } catch (e) {
+        // for cy-in-cy tests the config is the second instance of cypress isn't considered initialized yet.
+        // in this case since we only need it for experimental JIT in open mode, swallow the error
+      }
 
       if (_.isEqual(this.specs, specs)) {
         this.ctx.actions.project.refreshSpecs(specs)
@@ -403,24 +461,62 @@ export class ProjectDataSource {
 
   async defaultSpecFileName (): Promise<string> {
     const { specPattern = [] } = await this.ctx.project.specPatterns()
+    let fileExtensionToUse: FileExtension = this.ctx.lifecycleManager.fileExtensionToUse
+
+    // If generating a component test then check whether there are JSX/TSX files present in the project.
+    // If project uses JSX then user likely wants to use JSX for their tests as well.
+    // JSX can be used (or not used) with a variety of frameworks depending on user preference/config, so
+    // the only reliable way to determine is whether there are files with JSX extension present
+    if (this.ctx.coreData.currentTestingType === 'component') {
+      debug('Checking for jsx/tsx files to determine file extension for default spec filename')
+      const projectJsxFiles = await this.ctx.file.getFilesByGlob(this.ctx.currentProject ?? '', '**/*.[jt]sx')
+
+      if (projectJsxFiles.length > 0) {
+        debug('At least one jsx/tsx file found in project, utilizing for default spec filename')
+        const generatedSpecFileName = await getDefaultSpecFileName({
+          currentProject: this.ctx.currentProject,
+          testingType: this.ctx.coreData.currentTestingType,
+          fileExtensionToUse: `${fileExtensionToUse}x`,
+          specs: this.specs,
+          specPattern,
+        })
+
+        // There is the possibility that a specPattern has been configured to exclude spec files using jsx/tsx extensions
+        // In this case, fallback to default logic which will generate js/ts filename
+        if (await this.matchesSpecPattern(generatedSpecFileName)) {
+          return generatedSpecFileName
+        }
+
+        debug('jsx/tsx extension would violate configured specPattern, utilizing default spec filename')
+      } else {
+        debug('No jsx/tsx files found, utilizing default spec filename')
+      }
+    }
 
     return getDefaultSpecFileName({
       currentProject: this.ctx.currentProject,
       testingType: this.ctx.coreData.currentTestingType,
-      fileExtensionToUse: this.ctx.lifecycleManager.fileExtensionToUse,
+      fileExtensionToUse,
       specs: this.specs,
       specPattern,
     })
   }
 
-  async matchesSpecPattern (specFile: string): Promise<boolean> {
-    if (!this.ctx.currentProject || !this.ctx.coreData.currentTestingType) {
+  /**
+   * Determines whether a given spec file satisfies the spec pattern *and* does not satisfy any
+   * exclusionary pattern. By default it will check the spec pattern for the currently-active
+   * testing type, but a target testing type can be supplied via optional parameter.
+   */
+  async matchesSpecPattern (specFile: string, testingType?: TestingType): Promise<boolean> {
+    const targetTestingType = testingType || this.ctx.coreData.currentTestingType
+
+    if (!this.ctx.currentProject || !targetTestingType) {
       return false
     }
 
     const MINIMATCH_OPTIONS = { dot: true, matchBase: true }
 
-    const { specPattern = [], excludeSpecPattern = [] } = await this.ctx.project.specPatterns()
+    const { specPattern = [], excludeSpecPattern = [] } = await this.ctx.project.specPatternsByTestingType(targetTestingType)
 
     for (const pattern of excludeSpecPattern) {
       if (minimatch(specFile, pattern, MINIMATCH_OPTIONS)) {
@@ -465,7 +561,7 @@ export class ProjectDataSource {
 
     const looseComponentGlob = '*.{js,jsx,ts,tsx,vue}'
 
-    const framework = this.ctx.actions.project.getWizardFrameworkFromConfig()
+    const framework = this.ctx.actions.codegen.getWizardFrameworkFromConfig()
 
     return {
       component: framework?.glob ?? looseComponentGlob,
@@ -512,7 +608,11 @@ export class ProjectDataSource {
       throw Error(`Cannot find components without currentProject.`)
     }
 
-    const codeGenCandidates = await this.ctx.file.getFilesByGlob(projectRoot, glob, { expandDirectories: true })
+    const codeGenCandidates = await this.ctx.file.getFilesByGlob(
+      projectRoot,
+      glob,
+      { expandDirectories: true, ignore: ['**/*.config.{js,ts}', '**/*.{cy,spec}.{js,ts,jsx,tsx}'] },
+    )
 
     return codeGenCandidates.map((absolute) => ({ absolute }))
   }

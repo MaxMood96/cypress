@@ -4,8 +4,9 @@
  * You can find it here https://github.com/vitest-dev/vitest/blob/main/packages/vitest/src/node/create.ts
  */
 import debugFn from 'debug'
-import type { InlineConfig } from 'vite'
+import type { InlineConfig } from 'vite-5'
 import path from 'path'
+import semverGte from 'semver/functions/gte'
 
 import { configFiles } from './constants'
 import type { ViteDevServerConfig } from './devServer'
@@ -61,9 +62,11 @@ export const createViteDevServerConfig = async (config: ViteDevServerConfig, vit
   return finalConfig
 }
 
-function makeCypressViteConfig (config: ViteDevServerConfig, vite: Vite): InlineConfig {
+function makeCypressViteConfig (config: ViteDevServerConfig, vite: Vite): InlineConfig | InlineConfig {
   const {
     cypressConfig: {
+      experimentalJustInTimeCompile,
+      port,
       projectRoot,
       devServerPublicPathRoute,
       supportFile,
@@ -73,13 +76,19 @@ function makeCypressViteConfig (config: ViteDevServerConfig, vite: Vite): Inline
     specs,
   } = config
 
+  const vitePort = port ?? undefined
+
   // Vite caches its output in the .vite directory in the node_modules where vite lives.
   // So we want to find that node_modules path and ensure it's added to the "allow" list
   const vitePathNodeModules = path.dirname(path.dirname(require.resolve(`vite/package.json`, {
     paths: [projectRoot],
   })))
 
-  return {
+  // Our Vite typings do not have the 'incremental' field since it was removed in 4.2, but users' version
+  // of Vite may be older and we want to use it if it's there
+  type Vite_4_1_Config = { optimizeDeps: { esbuildOptions: { incremental?: boolean } } }
+
+  const viteConfig: InlineConfig & Vite_4_1_Config = {
     root: projectRoot,
     base: `${devServerPublicPathRoute}/`,
     optimizeDeps: {
@@ -112,11 +121,16 @@ function makeCypressViteConfig (config: ViteDevServerConfig, vite: Vite): Inline
           projectRoot,
           vitePathNodeModules,
           cypressBinaryRoot,
+          // Allow in monorepo: https://vitejs.dev/config/server-options.html#server-fs-allow
+          // Supported from Vite v3 - add null check for v2 users.
+          vite.searchForWorkspaceRoot?.(process.cwd()),
         ],
       },
+      port: vitePort,
       host: '127.0.0.1',
       // Disable file watching and HMR when executing tests in `run` mode
-      ...(isTextTerminal
+      // if experimentalJustInTimeCompile is configured, we need to watch for file changes as the spec entries are going to be updated per test in run mode
+      ...(isTextTerminal && !experimentalJustInTimeCompile
         ? { watch: { ignored: '**/*' }, hmr: false }
         : {}),
     },
@@ -125,4 +139,10 @@ function makeCypressViteConfig (config: ViteDevServerConfig, vite: Vite): Inline
       CypressSourcemap(config, vite),
     ],
   }
+
+  if (vite.version && semverGte(vite.version, '4.2.0')) {
+    delete viteConfig.optimizeDeps?.esbuildOptions?.incremental
+  }
+
+  return viteConfig
 }

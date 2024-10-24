@@ -185,10 +185,6 @@ describe('e2e sessions', () => {
     browser: 'chrome', // TODO(webkit): fix+unskip (needs multidomain support)
     spec: 'session/session.cy.js',
     snapshot: true,
-    config: {
-      experimentalSessionAndOrigin: true,
-      video: false,
-    },
   })
 
   it('handles spec and global sessions persistence on spec reload, and switching specs', {
@@ -198,8 +194,6 @@ describe('e2e sessions', () => {
     snapshot: true,
     config: {
       env: { SYSTEM_TESTS: true },
-      experimentalSessionAndOrigin: true,
-      video: false,
     },
   })
 })

@@ -1,6 +1,6 @@
 /* eslint-disable no-irregular-whitespace */
 import FileRow from './FileRow.vue'
-import faker from 'faker'
+import { faker } from '@faker-js/faker'
 import { defaultMessages } from '@cy/i18n'
 
 const content = `import { defineConfig } from 'cypress'
@@ -117,10 +117,10 @@ describe('FileRow', () => {
     cy.contains(changesRequiredDescription).should('be.visible')
     cy.get('pre').should('have.length', 2)
 
-    cy.percySnapshot('row starts open')
+    cy.get('.shiki').should('be.visible')
     cy.contains('cypress/integration/command.js').click()
 
-    cy.percySnapshot('row collapses after click')
+    cy.get('.shiki').should('not.be.visible')
   })
 
   it('responds nice to small screens', { viewportWidth: 500 }, () => {

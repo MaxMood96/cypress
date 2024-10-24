@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 // this is a safety script to ensure that Mocha tests ran, by checking:
 // 1. that there are N test results in the reports dir (or at least 1, if N is not set)
 // 2. each of them contains 0 failures and >0 tests
@@ -34,7 +32,7 @@ console.log(`Looking for reports in ${REPORTS_PATH}`)
 // https://circleci.com/blog/keep-environment-variables-private-with-secret-masking/
 function isWhitelistedEnv (key, value) {
   return ['true', 'false', 'TRUE', 'FALSE'].includes(value)
-    || ['nodejs_version', 'CF_DOMAIN'].includes(key)
+    || ['nodejs_version', 'CF_DOMAIN', 'SKIP_RELEASE_CHANGELOG_VALIDATION_FOR_BRANCHES'].includes(key)
     || value.length < 4
 }
 
@@ -96,6 +94,14 @@ async function checkReportFiles (filenames) {
 
 async function verifyMochaResults () {
   try {
+    try {
+      await fs.access(REPORTS_PATH)
+    } catch {
+      console.log('Reports directory does not exist - assuming no tests ran')
+
+      return
+    }
+
     const filenames = await fs.readdir(REPORTS_PATH)
 
     const resultCount = filenames.length

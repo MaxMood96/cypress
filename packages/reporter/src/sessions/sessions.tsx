@@ -1,7 +1,7 @@
 import cs from 'classnames'
 import React from 'react'
 import { observer } from 'mobx-react'
-import GlobeIcon from '-!react-svg-loader!@packages/frontend-shared/src/assets/icons/globe_x12.svg'
+import GlobeIcon from '@packages/frontend-shared/src/assets/icons/globe_x12.svg'
 
 import SessionsModel from './sessions-model'
 import events from '../lib/events'
@@ -13,7 +13,9 @@ export interface SessionPanelProps {
   model: Record<string, SessionsModel>
 }
 
-const SessionRow = ({ name, isGlobalSession, id, state, status, testId }: SessionsModel) => {
+const SessionRow = (model: SessionsModel) => {
+  const { name, isGlobalSession, id, status, testId } = model
+
   const printToConsole = (id) => {
     events.emit('show:command', testId, id)
   }
@@ -31,13 +33,11 @@ const SessionRow = ({ name, isGlobalSession, id, state, status, testId }: Sessio
           {isGlobalSession && <GlobeIcon className='global-session-icon' />}
           {name}
         </span>
-        <span className='session-tag'>
-          <Tag
-            customClassName='session-status'
-            content={status}
-            type={`${state === 'failed' ? 'failed' : 'successful'}-status`}
-          />
-        </span>
+        <Tag
+          customClassName='session-status'
+          content={status}
+          type={model.tagType}
+        />
       </div>
     </FlashOnClick>
   )

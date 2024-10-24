@@ -85,6 +85,11 @@
   {
     "value": false,
     "from": "default",
+    "field": "experimentalCspAllowList"
+  },
+  {
+    "value": false,
+    "from": "default",
     "field": "experimentalFetchPolyfill"
   },
   {
@@ -96,11 +101,6 @@
     "value": false,
     "from": "default",
     "field": "experimentalSourceRewriting"
-  },
-  {
-    "value": false,
-    "from": "default",
-    "field": "experimentalSessionAndOrigin"
   },
   {
     "value": false,
@@ -233,12 +233,12 @@
     "field": "userAgent"
   },
   {
-    "value": true,
+    "value": false,
     "from": "default",
     "field": "video"
   },
   {
-    "value": 32,
+    "value": false,
     "from": "default",
     "field": "videoCompression"
   },
@@ -246,11 +246,6 @@
     "value": "cypress/videos",
     "from": "default",
     "field": "videosFolder"
-  },
-  {
-    "value": true,
-    "from": "default",
-    "field": "videoUploadOnPasses"
   },
   {
     "value": 850,
@@ -289,7 +284,7 @@
               "vue3-file-selector",
               "just-my-luck",
               "combine-properties",
-              "faker",
+              "@faker-js/faker",
               "cypress/support/customPercyCommand"
             ]
           }
