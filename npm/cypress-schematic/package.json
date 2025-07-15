@@ -24,7 +24,7 @@
     "@types/mocha": "8.0.3",
     "@types/node": "^20.16.0",
     "typescript": "~5.4.5",
-    "vitest": "2.1.4"
+    "vitest": "2.1.9"
   },
   "peerDependencies": {
     "@angular/cli": ">=17.2",
