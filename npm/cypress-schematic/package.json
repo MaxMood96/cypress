@@ -18,7 +18,7 @@
     "@angular-devkit/core": "^18.2.11",
     "@angular-devkit/schematics": "^18.2.11",
     "@angular-devkit/schematics-cli": "^18.2.11",
-    "@angular/cli": "^18.2.11",
+    "@angular/cli": "^19.0.0",
     "@schematics/angular": "^18.2.11",
     "@types/chai-enzyme": "0.6.13",
     "@types/mocha": "8.0.3",
