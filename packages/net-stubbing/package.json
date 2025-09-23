@@ -27,7 +27,7 @@
     "@packages/telemetry": "0.0.0-development",
     "@types/mime": "^3.0.1",
     "chai": "4.2.0",
-    "mocha": "7.1.2"
+    "mocha": "9.1.2"
   },
   "files": [
     "lib"
