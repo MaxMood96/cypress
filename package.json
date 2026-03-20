@@ -73,7 +73,7 @@
     "watch": "yarn gulp watch"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "3.485.0",
+    "@aws-sdk/client-s3": "3.529.0",
     "@aws-sdk/credential-providers": "3.53.0",
     "@babel/eslint-parser": "7.28.0",
     "@cypress/request": "^3.0.10",
@@ -137,7 +137,7 @@
     "detect-port": "^2.1.0",
     "electron": "37.6.0",
     "electron-builder": "^25.1.8",
-    "eslint": "^8.56.0",
+    "eslint": "^9.0.0",
     "eslint-plugin-cypress": "3.5.0",
     "eslint-plugin-graphql": "4.0.0",
     "eslint-plugin-import": "2.25.4",
@@ -147,7 +147,7 @@
     "eslint-plugin-react-hooks": "4.2.0",
     "eslint-plugin-vue": "7.18.0",
     "execa": "4.1.0",
-    "fast-xml-parser": "^4.5.4",
+    "fast-xml-parser": "^5.5.7",
     "filesize": "10.1.6",
     "fs-extra": "9.1.0",
     "glob": "7.1.6",
